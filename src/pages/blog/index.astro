@@ -1,38 +1,20 @@
 ---
 import { getCollection } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import Header from '../../components/Header.astro';
-import Footer from '../../components/Footer.astro';
-import BlogCard from '../../components/BlogCard.astro';
+import ExactHeader from '../../components/ExactHeader.astro';
+import ExactFooter from '../../components/ExactFooter.astro';
+import BlogIndexPage from '../../components/BlogIndexPage.astro';
 
-const posts = (await getCollection('blog')).sort(
+const PER_PAGE = 32;
+const allPosts = (await getCollection('blog')).sort(
   (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
 );
+const totalPages = Math.max(1, Math.ceil(allPosts.length / PER_PAGE));
+const page = 1;
+const posts = allPosts.slice(0, PER_PAGE);
 ---
 <BaseLayout title="Blog" description="Artikelen en blogs over interieur op Interieuradviespunt.nl">
-  <Header slot="header" />
-  <section class="blog-index section">
-    <div class="container">
-      <header class="section-header section-header--center reveal">
-        <h1>Artikelen en blogs voor je interieur</h1>
-        <p>
-          Op Interieuradviespunt.nl delen we actuele informatie, trends en tips zodat je bij de tijd blijft met de nieuwste ontwikkelingen voor je interieur.
-        </p>
-      </header>
-      <div class="card-grid card-grid--3">
-        {posts.map((post, index) => (
-          <div class="reveal" style={`transition-delay: ${index * 0.04}s`}>
-            <BlogCard
-              title={post.data.title}
-              href={`/${post.id}/`}
-              image={post.data.featuredImage ?? '/images/2023/05/wanddecoratie.jpg'}
-              date={post.data.pubDate.toISOString().slice(0, 10)}
-              excerpt={post.data.description}
-            />
-          </div>
-        ))}
-      </div>
-    </div>
-  </section>
-  <Footer slot="footer" />
+  <ExactHeader slot="header" />
+  <BlogIndexPage posts={posts} page={page} totalPages={totalPages} />
+  <ExactFooter slot="footer" />
 </BaseLayout>

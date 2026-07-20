@@ -45,6 +45,7 @@ const currentPath = Astro.url.pathname;
     background: var(--color-bg);
     border-bottom: 1px solid transparent;
     transition: border-color var(--transition), box-shadow var(--transition);
+    overflow: visible;
   }
 
   .header--scrolled {
@@ -194,4 +195,44 @@ const currentPath = Astro.url.pathname;
   };
   updateHeader();
   window.addEventListener('scroll', updateHeader, { passive: true });
+
+  const overlay = document.querySelector('.search-overlay');
+  const openBtn = document.querySelector('.search-toggle');
+  const closeBtn = document.querySelector('.search-close');
+  const input = document.querySelector('#site-search');
+
+  const openSearch = () => {
+    overlay?.classList.add('search-overlay--active');
+    document.body.style.overflow = 'hidden';
+    window.setTimeout(() => input?.focus(), 40);
+  };
+
+  const closeSearch = () => {
+    overlay?.classList.remove('search-overlay--active');
+    document.body.style.overflow = '';
+    input?.blur();
+  };
+
+  openBtn?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (overlay?.classList.contains('search-overlay--active')) closeSearch();
+    else openSearch();
+  });
+
+  closeBtn?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    closeSearch();
+  });
+
+  overlay?.addEventListener('click', (e) => {
+    const target = e.target;
+    if (target instanceof Element && target.closest('input, label, .search-form')) return;
+    closeSearch();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeSearch();
+  });
 </script>

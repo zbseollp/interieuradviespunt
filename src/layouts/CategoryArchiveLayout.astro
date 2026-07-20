@@ -1,0 +1,81 @@
+---
+import fs from 'node:fs';
+import path from 'node:path';
+import type { CollectionEntry } from 'astro:content';
+
+interface Entry {
+  slug: string;
+  path: string;
+  label: string;
+  kind: string;
+}
+
+interface Props {
+  categorySlug: string;
+  title: string;
+  posts: CollectionEntry<'blog'>[];
+  entries?: Entry[];
+}
+
+const { categorySlug, title, posts, entries = [] } = Astro.props;
+
+const sharedDir = path.join(process.cwd(), 'src/content/exact-pages/_shared');
+const headerHtml = fs.readFileSync(path.join(sharedDir, 'header.html'), 'utf-8');
+const footerHtml = fs.readFileSync(path.join(sharedDir, 'footer.html'), 'utf-8');
+const inlineCss = fs.readFileSync(path.join(sharedDir, 'inline.css'), 'utf-8');
+const cssPaths: string[] = JSON.parse(
+  fs.readFileSync(path.join(sharedDir, 'css-paths.json'), 'utf-8')
+);
+
+const pageTitle = `${title} - interieuradviespunt`;
+const canonical = `https://interieuradviespunt.nl/category/${categorySlug}/`;
+
+const postItems = posts
+  .map(
+    (post) =>
+      `<li><a href="/${post.id}/">${post.data.title
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')}</a></li>`
+  )
+  .join('');
+
+const entryItems = entries
+  .slice(0, 200)
+  .map(
+    (item) =>
+      `<li><a href="${item.path}">${item.label
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')}</a></li>`
+  )
+  .join('');
+
+const pageHtml = `<main id="content" class="site-main">
+  <div class="page-header"><h1 class="entry-title">${title.replace(/&/g, '&amp;')}</h1></div>
+  <div class="page-content">
+    <p class="wp-block-paragraph">Artikelen en pagina's in de categorie ${title.replace(/&/g, '&amp;')}.</p>
+    ${posts.length ? `<h2 class="wp-block-heading">Berichten</h2><ul>${postItems}</ul>` : ''}
+    ${entries.length ? `<h2 class="wp-block-heading">Pagina's</h2><ul>${entryItems}</ul>` : ''}
+    <p class="wp-block-paragraph"><a href="/sitemap/">Terug naar de sitemap</a></p>
+  </div>
+</main>`;
+---
+<!doctype html>
+<html lang="nl-NL">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{pageTitle}</title>
+  <link rel="canonical" href={canonical} />
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/2022/08/cropped-Group-5-32x32.png" />
+  {cssPaths.map((href) => <link rel="stylesheet" href={href} />)}
+  <style set:html={inlineCss}></style>
+</head>
+<body class="archive category wp-embed-responsive wp-theme-hello-elementor hello-elementor-default elementor-default elementor-kit-9">
+  <Fragment set:html={headerHtml} />
+  <Fragment set:html={pageHtml} />
+  <Fragment set:html={footerHtml} />
+  <script src="/js/exact-header-interactions.js" defer></script>
+</body>
+</html>

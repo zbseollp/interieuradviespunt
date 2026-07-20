@@ -1,0 +1,73 @@
+/* Full-screen search overlay: visible close button + polish */
+.elementor-search-form--skin-full_screen .elementor-search-form__container.elementor-search-form--full-screen {
+  cursor: pointer;
+}
+
+.elementor-search-form--skin-full_screen
+  .elementor-search-form__container.elementor-search-form--full-screen
+  .elementor-search-form__input {
+  cursor: text;
+}
+
+.elementor-search-form--skin-full_screen
+  .elementor-search-form__container.elementor-search-form--full-screen
+  .dialog-lightbox-close-button,
+.elementor-search-form--skin-full_screen
+  .elementor-search-form__container.elementor-search-form--full-screen
+  .dialog-close-button {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.25rem;
+  left: auto;
+  z-index: 2;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+  color: #fcfcfc;
+  font-size: 1.75rem;
+  line-height: 1;
+  background: transparent;
+  border: 0;
+  opacity: 0.9;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.elementor-search-form--skin-full_screen
+  .elementor-search-form__container.elementor-search-form--full-screen
+  .dialog-lightbox-close-button:hover,
+.elementor-search-form--skin-full_screen
+  .elementor-search-form__container.elementor-search-form--full-screen
+  .dialog-close-button:hover {
+  opacity: 1;
+  transform: scale(1.08);
+}
+
+.elementor-search-form--skin-full_screen
+  .elementor-search-form__container.elementor-search-form--full-screen
+  .dialog-lightbox-close-button i,
+.elementor-search-form--skin-full_screen
+  .elementor-search-form__container.elementor-search-form--full-screen
+  .dialog-close-button i {
+  display: block;
+  font-size: inherit;
+  line-height: 1;
+  color: inherit;
+}
+
+@media (min-width: 768px) {
+  .elementor-search-form--skin-full_screen
+    .elementor-search-form__container.elementor-search-form--full-screen
+    .dialog-lightbox-close-button,
+  .elementor-search-form--skin-full_screen
+    .elementor-search-form__container.elementor-search-form--full-screen
+    .dialog-close-button {
+    top: 1.75rem;
+    right: 1.75rem;
+    font-size: 2rem;
+  }
+}

@@ -2,28 +2,42 @@
 import { getCollection, render } from 'astro:content';
 import fs from 'node:fs';
 import path from 'node:path';
-import { allSiteSlugs, allProductSlugs, mainNavigation } from '../data/navigation';
+import { allSiteSlugs, allProductSlugs } from '../data/navigation';
 import { createFallbackPage } from '../data/content';
+import { categoryHubs } from '../data/categoryHubs';
 import BlogPostLayout from '../layouts/BlogPostLayout.astro';
 import PageLayout from '../layouts/PageLayout.astro';
 import ProductPageLayout from '../layouts/ProductPageLayout.astro';
+import ExactElementorLayout from '../layouts/ExactElementorLayout.astro';
 import ArticleLayout from '../layouts/ArticleLayout.astro';
-import Header from '../components/Header.astro';
-import Footer from '../components/Footer.astro';
-import BlogCard from '../components/BlogCard.astro';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import SitemapEntryLayout from '../layouts/SitemapEntryLayout.astro';
+import CategoryArchiveLayout from '../layouts/CategoryArchiveLayout.astro';
+import ExactHeader from '../components/ExactHeader.astro';
+import ExactFooter from '../components/ExactFooter.astro';
+import CategoryHub from '../components/CategoryHub.astro';
+import SitemapPage from '../components/SitemapPage.astro';
+import ArchitectenbureausPage from '../components/ArchitectenbureausPage.astro';
+
+type SitemapEntry = {
+  slug: string;
+  path: string;
+  label: string;
+  kind: string;
+};
 
 export async function getStaticPaths() {
   const blogEntries = await getCollection('blog');
   const pageEntries = await getCollection('pages');
+  const exactRoot = path.join(process.cwd(), 'src/content/exact-pages');
+  const categorySlugs = new Set(Object.keys(categoryHubs));
+  const sitemapList = JSON.parse(
+    fs.readFileSync(path.join(process.cwd(), 'src/data/sitemapEntries.json'), 'utf-8')
+  ) as SitemapEntry[];
 
   const blogPaths = blogEntries.map((entry) => ({
     params: { slug: entry.id },
     props: { type: 'blog' as const, entry },
-  }));
-
-  const pagePaths = pageEntries.map((entry) => ({
-    params: { slug: entry.id },
-    props: { type: 'page' as const, entry },
   }));
 
   const covered = new Set([
@@ -32,54 +46,188 @@ export async function getStaticPaths() {
     'contact',
     'blog',
     'home',
+    'beste-lightbox',
   ]);
+
+  const pagePaths = pageEntries
+    .filter((entry) => entry.id !== 'beste-lightbox')
+    .map((entry) => ({
+      params: { slug: entry.id },
+      props: {
+        type: 'page' as const,
+        entry,
+        exact:
+          !categorySlugs.has(entry.id) &&
+          fs.existsSync(path.join(exactRoot, entry.id, 'page.html')),
+      },
+    }));
 
   const legacyPaths = [...new Set([...allSiteSlugs, ...allProductSlugs])]
     .filter((slug) => !covered.has(slug))
     .map((slug) => ({
       params: { slug },
-      props: { type: 'legacy' as const, slug },
+      props: {
+        type: 'legacy' as const,
+        slug,
+        exact: fs.existsSync(path.join(exactRoot, slug, 'page.html')),
+      },
     }));
 
-  return [...blogPaths, ...pagePaths, ...legacyPaths];
+  for (const p of [...blogPaths, ...pagePaths, ...legacyPaths]) {
+    covered.add(String(p.params.slug));
+  }
+
+  const categoryPaths = sitemapList
+    .filter((entry) => entry.kind === 'category' && !covered.has(entry.slug))
+    .map((entry) => {
+      covered.add(entry.slug);
+      return {
+        params: { slug: entry.slug },
+        props: { type: 'category' as const, entry },
+      };
+    });
+
+  const sitemapEntryPaths = sitemapList
+    .filter(
+      (entry) =>
+        entry.kind === 'entry' &&
+        entry.slug &&
+        !covered.has(entry.slug) &&
+        !fs.existsSync(path.join(exactRoot, entry.slug, 'page.html'))
+    )
+    .map((entry) => ({
+      params: { slug: entry.slug },
+      props: { type: 'sitemap-entry' as const, entry },
+    }));
+
+  return [
+    ...blogPaths,
+    ...pagePaths,
+    ...legacyPaths,
+    ...categoryPaths,
+    ...sitemapEntryPaths,
+  ];
 }
 
 const props = Astro.props;
+const exactRoot = path.join(process.cwd(), 'src/content/exact-pages');
 
-function getCategoryItems(pageSlug: string) {
-  const navItem = mainNavigation.find((item) => item.href === `/${pageSlug}/`);
-  if (!navItem?.children) return [];
-  const images = [
-    '/images/2023/05/wanddecoratie.jpg',
-    '/images/2023/05/kussen-1024x1016.jpg',
-    '/images/2023/05/meubels.jpg',
-    '/images/2023/05/klokken.jpg',
-  ];
-  return navItem.children.map((child, i) => ({
-    title: child.label,
-    href: child.href,
-    image: images[i % images.length],
-    alt: child.label,
-  }));
+const allSitemapEntries = JSON.parse(
+  fs.readFileSync(path.join(process.cwd(), 'src/data/sitemapEntries.json'), 'utf-8')
+) as SitemapEntry[];
+
+const pageSlug =
+  props.type === 'page'
+    ? props.entry.id
+    : props.type === 'legacy'
+      ? props.slug
+      : props.type === 'blog'
+        ? props.entry.id
+        : props.type === 'sitemap-entry' || props.type === 'category'
+          ? props.entry.slug
+          : null;
+
+const categoryHub =
+  pageSlug && props.type === 'page' && categoryHubs[pageSlug]
+    ? categoryHubs[pageSlug]
+    : null;
+
+const isSitemapPage = props.type === 'page' && props.entry.id === 'sitemap';
+const isArchitectenbureausPage =
+  props.type === 'page' && props.entry.id === 'architectenbureaus';
+
+const architectenbureausEntries = isArchitectenbureausPage
+  ? (JSON.parse(
+      fs.readFileSync(path.join(process.cwd(), 'src/data/architectenbureaus.json'), 'utf-8')
+    ) as SitemapEntry[])
+  : [];
+
+// Blog articles use the enhanced editorial layout (not ExactElementorLayout).
+// Sitemap / Architectenbureaus use enhanced directory layouts.
+const exactSlug =
+  props.type !== 'blog' &&
+  props.type !== 'sitemap-entry' &&
+  props.type !== 'category' &&
+  !categoryHub &&
+  !isSitemapPage &&
+  !isArchitectenbureausPage &&
+  pageSlug &&
+  fs.existsSync(path.join(exactRoot, pageSlug, 'page.html'))
+    ? pageSlug
+    : null;
+const isExact = Boolean(exactSlug);
+
+function extractBlogBody(slug: string): string | null {
+  const file = path.join(exactRoot, slug, 'page.html');
+  if (!fs.existsSync(file)) return null;
+  const html = fs.readFileSync(file, 'utf-8');
+  const match = html.match(
+    /<div[^>]*class="[^"]*page-content[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<\/main>/i
+  );
+  return match ? match[1].trim() : null;
 }
 
+const blogBodyHtml =
+  props.type === 'blog' ? extractBlogBody(props.entry.id) : null;
+
+const allBlogEntries =
+  props.type === 'blog' || props.type === 'category'
+    ? await getCollection('blog')
+    : [];
+
+const relatedPosts =
+  props.type === 'blog'
+    ? allBlogEntries
+        .filter((post) => post.id !== props.entry.id)
+        .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
+        .slice(0, 3)
+        .map((post) => ({
+          title: post.data.title,
+          href: `/${post.id}/`,
+          image: post.data.featuredImage ?? '/images/2023/05/wanddecoratie.jpg',
+        }))
+    : [];
+
+const categoryName = props.type === 'category' ? props.entry.slug.replace(/^category\//, '') : '';
+const categoryTitle =
+  props.type === 'category'
+    ? props.entry.label.replace(/^Category:\s*/i, '') || categoryName
+    : '';
+const categoryPosts =
+  props.type === 'category'
+    ? allBlogEntries.filter((post) =>
+        (post.data.categories ?? []).some(
+          (cat) => cat.toLowerCase() === categoryName.toLowerCase()
+        )
+      )
+    : [];
+
+const entryIndex =
+  props.type === 'sitemap-entry'
+    ? allSitemapEntries.findIndex((item) => item.slug === props.entry.slug)
+    : -1;
+const relatedEntries =
+  props.type === 'sitemap-entry' && entryIndex >= 0
+    ? allSitemapEntries
+        .slice(Math.max(0, entryIndex - 4), entryIndex)
+        .concat(allSitemapEntries.slice(entryIndex + 1, entryIndex + 5))
+        .filter((item) => item.kind === 'entry')
+    : [];
+
 const legacyPage = props.type === 'legacy' ? createFallbackPage(props.slug) : null;
-const categoryItems = props.type === 'page' ? getCategoryItems(props.entry.id) : [];
-const isCategoryHub =
-  props.type === 'page' &&
-  ['decoratie', 'slaapruimte', 'woonkamer', 'verlichting', 'wasruimte', 'tuin'].includes(
-    props.entry.id
-  );
 
 const { Content } =
-  props.type === 'blog' || props.type === 'page'
+  (props.type === 'blog' && !blogBodyHtml) ||
+  (props.type === 'page' &&
+    !isExact &&
+    !categoryHub &&
+    !isSitemapPage &&
+    !isArchitectenbureausPage)
     ? await render(props.entry)
     : { Content: null };
 
-const allPages = await getCollection('pages');
-
 const productHtmlPath =
-  props.type === 'page' && props.entry.data.pageType === 'product'
+  props.type === 'page' && props.entry.data.pageType === 'product' && !isExact
     ? path.join(process.cwd(), 'src/content/product-html', `${props.entry.id}.html`)
     : null;
 const productHtml =
@@ -87,122 +235,96 @@ const productHtml =
     ? fs.readFileSync(productHtmlPath, 'utf-8')
     : null;
 ---
-{props.type === 'blog' && Content && (
-  <BlogPostLayout entry={props.entry}>
-    <Header slot="header" />
-    <Content />
-    <Footer slot="footer" />
+{categoryHub && props.type === 'page' && (
+  <BaseLayout
+    title={categoryHub.title}
+    description={categoryHub.description}
+    image={categoryHub.image}
+  >
+    <ExactHeader slot="header" />
+    <CategoryHub hub={categoryHub} />
+    <ExactFooter slot="footer" />
+  </BaseLayout>
+)}
+
+{isSitemapPage && (
+  <BaseLayout
+    title="Sitemap"
+    description="Overzicht van alle pagina's, producten, artikelen en directory-items op Interieuradviespunt.nl."
+  >
+    <ExactHeader slot="header" />
+    <SitemapPage entries={allSitemapEntries} />
+    <ExactFooter slot="footer" />
+  </BaseLayout>
+)}
+
+{isArchitectenbureausPage && (
+  <BaseLayout
+    title={props.entry.data.title}
+    description={props.entry.data.description}
+  >
+    <ExactHeader slot="header" />
+    <ArchitectenbureausPage
+      entries={architectenbureausEntries}
+      description="Op zoek naar een ervaren architectenbureau voor jouw project? Ontdek onze selectie van toonaangevende architectenbureaus die bekend staan om hun innovatieve ontwerpen en vakmanschap. Van moderne woningen tot historische restauraties, deze bureaus bieden een scala aan expertise en creativiteit om aan jouw behoeften te voldoen."
+    />
+    <ExactFooter slot="footer" />
+  </BaseLayout>
+)}
+
+{exactSlug && <ExactElementorLayout slug={exactSlug} />}
+
+{props.type === 'blog' && (
+  <BlogPostLayout entry={props.entry} bodyHtml={blogBodyHtml} related={relatedPosts}>
+    <ExactHeader slot="header" />
+    {Content && <Content />}
+    <ExactFooter slot="footer" />
   </BlogPostLayout>
 )}
 
-{props.type === 'page' && props.entry.data.pageType === 'product' && productHtml && (
+{props.type === 'category' && (
+  <CategoryArchiveLayout
+    categorySlug={categoryName}
+    title={categoryTitle}
+    posts={categoryPosts}
+  />
+)}
+
+{props.type === 'sitemap-entry' && (
+  <SitemapEntryLayout entry={props.entry} related={relatedEntries} />
+)}
+
+{props.type === 'page' && !isExact && !categoryHub && props.entry.data.pageType === 'product' && productHtml && (
   <ProductPageLayout entry={props.entry}>
-    <Header slot="header" />
-    <div class="product-page-content reveal" set:html={productHtml} />
-    <Footer slot="footer" />
+    <ExactHeader slot="header" />
+    <div class="product-page-content" set:html={productHtml} />
+    <ExactFooter slot="footer" />
   </ProductPageLayout>
 )}
 
-{props.type === 'page' && Content && props.entry.data.pageType !== 'product' && (
+{props.type === 'page' && !isExact && !categoryHub && !isSitemapPage && !isArchitectenbureausPage && Content && props.entry.data.pageType !== 'product' && (
   <PageLayout entry={props.entry}>
-    <Header slot="header" />
+    <ExactHeader slot="header" />
     <div class="container">
       <div class="prose reveal">
         <Content />
       </div>
-      {isCategoryHub && categoryItems.length > 0 && (
-        <div class="category-grid">
-          <div class="card-grid card-grid--3">
-            {categoryItems.map((item) => (
-              <BlogCard
-                title={item.title}
-                href={item.href}
-                image={item.image}
-                excerpt={`Bekijk onze selectie ${item.title.toLowerCase()}.`}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-      {props.entry.id === 'sitemap' && (
-        <nav class="sitemap reveal" aria-label="Sitemap">
-          <h2>Pagina's</h2>
-          <ul>
-            <li><a href="/">Home</a></li>
-            <li><a href="/blog/">Blog</a></li>
-            <li><a href="/contact/">Contact</a></li>
-            {allPages.map((p) => (
-              <li><a href={`/${p.id}/`}>{p.data.title}</a></li>
-            ))}
-          </ul>
-          <h2>Producten</h2>
-          <ul class="sitemap__products">
-            {allProductSlugs.map((s) => (
-              <li><a href={`/${s}/`}>{s.replace(/^beste-/, '').replace(/-/g, ' ')}</a></li>
-            ))}
-          </ul>
-        </nav>
-      )}
     </div>
-    <Footer slot="footer" />
+    <ExactFooter slot="footer" />
   </PageLayout>
 )}
 
-{props.type === 'legacy' && legacyPage && (
+{props.type === 'legacy' && !isExact && legacyPage && (
   <ArticleLayout title={legacyPage.title} description={legacyPage.description} image={legacyPage.featuredImage}>
-    <Header slot="header" />
+    <ExactHeader slot="header" />
     <div set:html={legacyPage.content} />
-    <Footer slot="footer" />
+    <ExactFooter slot="footer" />
   </ArticleLayout>
 )}
 
 <style>
-  .category-grid {
-    padding-block: clamp(2rem, 4vw, 3rem);
-  }
-
-  .sitemap {
-    padding-block: 2rem;
-  }
-
-  .sitemap h2 {
-    font-size: 1.25rem;
-    margin-top: 2rem;
-  }
-
-  .sitemap ul {
-    list-style: none;
-    padding: 0;
-    columns: 2;
-    gap: 2rem;
-  }
-
-  .sitemap li {
-    margin-bottom: 0.5rem;
-  }
-
-  .sitemap a {
-    color: var(--color-muted);
-    transition: color var(--transition);
-  }
-
-  .sitemap a:hover {
-    color: var(--color-accent);
-  }
-
-  .sitemap__products {
-    columns: 3;
-  }
-
   .product-page-content {
     max-width: none;
     padding: 0;
-  }
-
-  @media (max-width: 767px) {
-    .sitemap ul,
-    .sitemap__products {
-      columns: 1;
-    }
   }
 </style>

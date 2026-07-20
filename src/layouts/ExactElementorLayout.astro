@@ -1,0 +1,190 @@
+---
+import fs from 'node:fs';
+import path from 'node:path';
+
+interface Props {
+  slug: string;
+  title?: string;
+  description?: string;
+  ogImage?: string;
+}
+
+const { slug, title: titleProp, description: descriptionProp, ogImage: ogImageProp } = Astro.props;
+
+const sharedDir = path.join(process.cwd(), 'src/content/exact-pages/_shared');
+const pageDir = path.join(process.cwd(), 'src/content/exact-pages', slug);
+
+const headerHtml = fs.readFileSync(path.join(sharedDir, 'header.html'), 'utf-8');
+const footerHtml = fs.readFileSync(path.join(sharedDir, 'footer.html'), 'utf-8');
+const inlineCss = fs.readFileSync(path.join(sharedDir, 'inline.css'), 'utf-8');
+const cssPaths: string[] = JSON.parse(
+  fs.readFileSync(path.join(sharedDir, 'css-paths.json'), 'utf-8')
+);
+
+const pageHtml = fs.readFileSync(path.join(pageDir, 'page.html'), 'utf-8');
+const metaPath = path.join(pageDir, 'meta.json');
+const meta = fs.existsSync(metaPath)
+  ? JSON.parse(fs.readFileSync(metaPath, 'utf-8'))
+  : { title: '', description: '', ogImage: '', bodyClass: '' };
+
+const title = titleProp || meta.title || slug;
+const description = descriptionProp || meta.description || '';
+const ogImage = ogImageProp || meta.ogImage || '';
+const bodyClass =
+  meta.bodyClass ||
+  'wp-singular page-template page-template-elementor_header_footer page wp-embed-responsive wp-theme-hello-elementor hello-elementor-default elementor-default elementor-template-full-width elementor-kit-9 elementor-page elementor-page-17';
+const canonical = `https://interieuradviespunt.nl/${slug}/`;
+
+// Category hub pages include inline .zbmp-category-links CSS inside page.html
+const pageInlineStyles = [...pageHtml.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)]
+  .map((m) => m[1])
+  .join('\n');
+const pageHtmlClean = pageHtml.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+---
+<!doctype html>
+<html lang="nl-NL">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{title}</title>
+  {description && <meta name="description" content={description} />}
+  <meta property="og:locale" content="nl_NL" />
+  <meta property="og:type" content="article" />
+  <meta property="og:title" content={title} />
+  {description && <meta property="og:description" content={description} />}
+  <meta property="og:url" content={canonical} />
+  <meta property="og:site_name" content="interieuradviespunt" />
+  {ogImage && <meta property="og:image" content={ogImage} />}
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="canonical" href={canonical} />
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/2022/08/cropped-Group-5-32x32.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/images/2022/08/cropped-Group-5-192x192.png" />
+  <link rel="apple-touch-icon" href="/images/2022/08/cropped-Group-5-180x180.png" />
+  {cssPaths.map((href) => <link rel="stylesheet" href={href} />)}
+  <style set:html={inlineCss}></style>
+  {pageInlineStyles && <style set:html={pageInlineStyles}></style>}
+</head>
+<body class={bodyClass}>
+  <Fragment set:html={headerHtml} />
+  <Fragment set:html={pageHtmlClean} />
+  <Fragment set:html={footerHtml} />
+
+  <script is:inline>
+    (function () {
+      // --- Elementor-compatible Table of Contents ---
+      const tocWidget = document.querySelector('.elementor-widget-table-of-contents');
+      const tocBody = tocWidget?.querySelector('.elementor-toc__body');
+      const pageRoot = document.querySelector('[data-elementor-type="wp-page"]');
+      if (tocBody && pageRoot) {
+        const headings = [...pageRoot.querySelectorAll('h2, h3, h4, h5, h6')].filter((h) => {
+          if (h.closest('.elementor-toc__header')) return false;
+          const text = h.textContent.trim();
+          return text.length > 0;
+        });
+
+        const list = document.createElement('ul');
+        list.className = 'elementor-toc__list-wrapper';
+
+        let currentH2Li = null;
+        let nestedUl = null;
+        let index = 0;
+
+        headings.forEach((heading) => {
+          const level = Number(heading.tagName.substring(1));
+          const anchorId = `elementor-toc__heading-anchor-${index}`;
+          index += 1;
+
+          // Only set id — do NOT add `.elementor-toc__heading-anchor` to the
+          // heading itself. Elementor CSS makes that class position:absolute,
+          // which collapses the heading widget height and overlaps following text.
+          if (!heading.id) heading.id = anchorId;
+
+          const li = document.createElement('li');
+          li.className = 'elementor-toc__list-item';
+          const wrap = document.createElement('div');
+          wrap.className = 'elementor-toc__list-item-text-wrapper';
+          const a = document.createElement('a');
+          a.href = `#${heading.id}`;
+          a.className = 'elementor-toc__list-item-text' + (level <= 2 ? ' elementor-toc__top-level' : '');
+          a.textContent = heading.textContent.trim();
+          wrap.appendChild(a);
+          li.appendChild(wrap);
+
+          if (level <= 2) {
+            list.appendChild(li);
+            currentH2Li = li;
+            nestedUl = null;
+          } else if (currentH2Li) {
+            if (!nestedUl) {
+              nestedUl = document.createElement('ul');
+              nestedUl.className = 'elementor-toc__list-wrapper';
+              currentH2Li.appendChild(nestedUl);
+            }
+            nestedUl.appendChild(li);
+          } else {
+            list.appendChild(li);
+          }
+        });
+
+        tocBody.innerHTML = '';
+        tocBody.appendChild(list);
+
+        const links = [...tocBody.querySelectorAll('.elementor-toc__list-item-text')];
+        const observer = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (!entry.isIntersecting) return;
+              const id = entry.target.id;
+              links.forEach((link) => {
+                link.classList.toggle('elementor-item-active', link.getAttribute('href') === `#${id}`);
+              });
+            });
+          },
+          { rootMargin: '-20% 0px -60% 0px', threshold: 0 }
+        );
+        headings.forEach((h) => observer.observe(h));
+      }
+
+      document.querySelectorAll('.elementor-toc__toggle-button').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          tocWidget?.classList.toggle('elementor-toc--collapsed');
+        });
+      });
+
+      document.querySelectorAll('.elementor-accordion-item .elementor-tab-title').forEach((title) => {
+        const item = title.closest('.elementor-accordion-item');
+        const content = item?.querySelector('.elementor-tab-content');
+        if (content && title.getAttribute('aria-expanded') !== 'true') {
+          content.hidden = true;
+          content.style.display = 'none';
+        }
+        title.addEventListener('click', (e) => {
+          e.preventDefault();
+          const expanded = title.getAttribute('aria-expanded') === 'true';
+          item?.parentElement?.querySelectorAll('.elementor-accordion-item').forEach((sib) => {
+            if (sib === item) return;
+            const t = sib.querySelector('.elementor-tab-title');
+            const c = sib.querySelector('.elementor-tab-content');
+            t?.setAttribute('aria-expanded', 'false');
+            t?.classList.remove('elementor-active');
+            c?.classList.remove('elementor-active');
+            if (c) {
+              c.hidden = true;
+              c.style.display = 'none';
+            }
+          });
+          title.setAttribute('aria-expanded', String(!expanded));
+          title.classList.toggle('elementor-active', !expanded);
+          content?.classList.toggle('elementor-active', !expanded);
+          if (content) {
+            content.hidden = expanded;
+            content.style.display = expanded ? 'none' : 'block';
+          }
+        });
+      });
+
+    })();
+  </script>
+  <script src="/js/exact-header-interactions.js" defer></script>
+</body>
+</html>

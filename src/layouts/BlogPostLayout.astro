@@ -1,106 +1,369 @@
 ---
 import type { CollectionEntry } from 'astro:content';
+import fs from 'node:fs';
+import path from 'node:path';
 import BaseLayout from './BaseLayout.astro';
 
 interface Props {
   entry: CollectionEntry<'blog'>;
+  bodyHtml?: string | null;
+  related?: { title: string; href: string; image: string }[];
 }
 
-const { entry } = Astro.props;
-const featuredImage = entry.data.featuredImage ?? '/images/2023/05/wanddecoratie.jpg';
+const { entry, bodyHtml = null, related = [] } = Astro.props;
+
+const metaPath = path.join(process.cwd(), 'src/content/exact-pages', entry.id, 'meta.json');
+const exactMeta = fs.existsSync(metaPath)
+  ? JSON.parse(fs.readFileSync(metaPath, 'utf-8'))
+  : null;
+
+const featuredImage =
+  exactMeta?.ogImage ||
+  entry.data.featuredImage ||
+  '/images/2023/05/wanddecoratie.jpg';
 const imageAlt = entry.data.imageAlt ?? entry.data.title;
 const formattedDate = entry.data.pubDate.toLocaleDateString('nl-NL', {
   year: 'numeric',
   month: 'long',
   day: 'numeric',
 });
+const category = entry.data.categories?.[0] ?? 'Blog';
 ---
 <BaseLayout title={entry.data.title} description={entry.data.description} image={featuredImage}>
   <slot name="header" slot="header" />
-  <article class="blog-post">
-    <header class="blog-post__header">
-      <div class="container">
-        <time class="blog-post__date" datetime={entry.data.pubDate.toISOString()}>{formattedDate}</time>
-        <h1>{entry.data.title}</h1>
-        {entry.data.description && <p class="blog-post__excerpt">{entry.data.description}</p>}
-        {entry.data.author && <p class="blog-post__author">{entry.data.author}</p>}
-        {entry.data.categories && entry.data.categories.length > 0 && (
-          <ul class="blog-post__categories">
-            {entry.data.categories.map((category) => (
-              <li>{category}</li>
-            ))}
-          </ul>
-        )}
+
+  <article class="article">
+    <header class="article-hero">
+      <div class="article-hero__media" aria-hidden="true">
+        <img src={featuredImage} alt="" width="1600" height="900" loading="eager" />
       </div>
-      <div class="blog-post__hero">
-        <img src={featuredImage} alt={imageAlt} width="1200" height="630" loading="eager" />
+      <div class="article-hero__shade" aria-hidden="true"></div>
+      <div class="container article-hero__content">
+        <p class="article-hero__eyebrow reveal">{category}</p>
+        <h1 class="article-hero__title reveal">{entry.data.title}</h1>
+        {entry.data.description && (
+          <p class="article-hero__lead reveal">{entry.data.description}</p>
+        )}
+        <div class="article-hero__meta reveal">
+          <time datetime={entry.data.pubDate.toISOString()}>{formattedDate}</time>
+          {entry.data.author && <span aria-hidden="true">·</span>}
+          {entry.data.author && <span>{entry.data.author}</span>}
+        </div>
       </div>
     </header>
-    <div class="container blog-post__body prose reveal">
-      <slot />
+
+    <div class="article-figure reveal">
+      <img src={featuredImage} alt={imageAlt} width="1200" height="675" loading="eager" />
     </div>
+
+    <div class="container article-body reveal">
+      {bodyHtml ? (
+        <div class="article-prose" set:html={bodyHtml} />
+      ) : (
+        <div class="article-prose">
+          <slot />
+        </div>
+      )}
+    </div>
+
+    {related.length > 0 && (
+      <section class="article-related" aria-labelledby="related-heading">
+        <div class="container">
+          <div class="article-related__head reveal">
+            <p class="article-related__eyebrow">Verder lezen</p>
+            <h2 id="related-heading">Meer artikelen</h2>
+          </div>
+          <div class="article-related__grid">
+            {related.map((item, index) => (
+              <a
+                href={item.href}
+                class="article-related__item reveal"
+                style={`transition-delay: ${index * 0.05}s`}
+              >
+                <span class="article-related__image">
+                  <img src={item.image} alt="" width="640" height="400" loading="lazy" />
+                </span>
+                <span class="article-related__title">{item.title}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>
+    )}
   </article>
+
   <slot name="footer" slot="footer" />
 </BaseLayout>
 
 <style>
-  .blog-post__header {
-    padding-top: clamp(2rem, 5vw, 4rem);
+  .article {
+    background: var(--color-bg);
+    color: var(--color-text);
   }
 
-  .blog-post__date {
-    display: block;
-    font-size: 0.875rem;
-    color: var(--color-accent);
-    margin-bottom: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
+  .article-hero {
+    position: relative;
+    min-height: clamp(20rem, 52vh, 30rem);
+    display: grid;
+    align-items: end;
+    overflow: hidden;
+    isolation: isolate;
   }
 
-  .blog-post__author {
-    font-size: 0.875rem;
-    color: var(--color-muted);
+  .article-hero__media {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+  }
+
+  .article-hero__media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scale(1.03);
+    animation: article-kenburns 16s ease-out forwards;
+  }
+
+  .article-hero__shade {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background:
+      linear-gradient(180deg, rgba(38, 38, 38, 0.25) 0%, rgba(38, 38, 38, 0.55) 40%, rgba(38, 38, 38, 0.97) 100%),
+      linear-gradient(90deg, rgba(38, 38, 38, 0.9) 0%, rgba(38, 38, 38, 0.4) 55%, rgba(38, 38, 38, 0.2) 100%);
+  }
+
+  .article-hero__content {
+    position: relative;
+    padding-block: clamp(4rem, 9vw, 6.5rem) clamp(2rem, 5vw, 3rem);
+    max-width: 46rem;
+  }
+
+  .article-hero__eyebrow {
     margin: 0 0 0.75rem;
+    font-family: var(--font-heading);
+    font-size: 0.8125rem;
+    font-weight: 400;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--color-accent);
   }
 
-  .blog-post__categories {
+  .article-hero__title {
+    margin: 0 0 1rem;
+    font-size: clamp(2rem, 5.5vw, 3.5rem);
+    line-height: 1.05;
+    letter-spacing: 0.01em;
+  }
+
+  .article-hero__lead {
+    margin: 0 0 1.25rem;
+    max-width: 38rem;
+    color: var(--color-muted);
+    font-size: clamp(1rem, 1.5vw, 1.125rem);
+    line-height: 1.65;
+  }
+
+  .article-hero__meta {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
-    margin: 0 0 1rem;
-    padding: 0;
-    list-style: none;
-  }
-
-  .blog-post__categories li {
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--color-accent);
-    border: 1px solid var(--color-border);
-    padding: 0.25rem 0.625rem;
-  }
-
-  .blog-post__excerpt {
-    font-size: 1.125rem;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    font-size: 0.875rem;
     color: var(--color-muted);
-    max-width: 42rem;
   }
 
-  .blog-post__hero {
-    margin-top: 2rem;
+  .article-hero__meta time {
+    color: var(--color-accent);
+    font-family: var(--font-heading);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-size: 0.8125rem;
+  }
+
+  .article-figure {
+    width: min(100% - 2rem, var(--container-max));
+    margin: -1.5rem auto clamp(2rem, 4vw, 3rem);
     aspect-ratio: 16 / 9;
     overflow: hidden;
     background: var(--color-bg-elevated);
+    box-shadow: var(--shadow-md);
   }
 
-  .blog-post__hero img {
+  .article-figure img {
     width: 100%;
     height: 100%;
     object-fit: cover;
   }
 
-  .blog-post__body {
-    padding-block: clamp(2rem, 4vw, 3.5rem);
+  .article-body {
+    max-width: 44rem;
+    padding-bottom: clamp(3rem, 6vw, 5rem);
+  }
+
+  .article-prose {
+    font-size: clamp(1.05rem, 1.4vw, 1.125rem);
+    line-height: 1.75;
+    color: #e8e8e8;
+  }
+
+  .article-prose :global(h1),
+  .article-prose :global(.entry-title) {
+    display: none;
+  }
+
+  .article-prose :global(h2),
+  .article-prose :global(h3),
+  .article-prose :global(h4),
+  .article-prose :global(.wp-block-heading) {
+    font-family: var(--font-heading);
+    color: var(--color-primary);
+    line-height: 1.2;
+    margin: 2.25rem 0 0.85rem;
+    font-weight: 700;
+  }
+
+  .article-prose :global(h2),
+  .article-prose :global(h2.wp-block-heading) {
+    font-size: clamp(1.5rem, 3vw, 2rem);
+  }
+
+  .article-prose :global(h3),
+  .article-prose :global(h3.wp-block-heading) {
+    font-size: clamp(1.25rem, 2.2vw, 1.5rem);
+  }
+
+  .article-prose :global(p),
+  .article-prose :global(.wp-block-paragraph) {
+    margin: 0 0 1.25rem;
+  }
+
+  .article-prose :global(a) {
+    color: var(--color-accent);
+    text-decoration: underline;
+    text-underline-offset: 0.18em;
+    transition: color var(--transition);
+  }
+
+  .article-prose :global(a:hover) {
+    color: var(--color-accent-hover);
+  }
+
+  .article-prose :global(strong) {
+    color: var(--color-primary);
+    font-weight: 700;
+  }
+
+  .article-prose :global(ul),
+  .article-prose :global(ol) {
+    margin: 0 0 1.25rem;
+    padding-left: 1.25rem;
+  }
+
+  .article-prose :global(li) {
+    margin-bottom: 0.45rem;
+  }
+
+  .article-prose :global(img) {
+    width: 100%;
+    height: auto;
+    margin: 1.5rem 0;
+  }
+
+  .article-prose :global(blockquote) {
+    margin: 1.75rem 0;
+    padding: 0.25rem 0 0.25rem 1.25rem;
+    border-left: 3px solid var(--color-accent);
+    color: var(--color-muted);
+    font-size: 1.05em;
+  }
+
+  .article-related {
+    padding-block: clamp(2.5rem, 5vw, 4rem) clamp(3.5rem, 7vw, 5.5rem);
+    border-top: 1px solid var(--color-border);
+    background: linear-gradient(180deg, rgba(46, 46, 46, 0.35), transparent 55%);
+  }
+
+  .article-related__head {
+    margin-bottom: 1.5rem;
+  }
+
+  .article-related__eyebrow {
+    margin: 0 0 0.4rem;
+    font-family: var(--font-heading);
+    font-size: 0.75rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-accent);
+  }
+
+  .article-related__head h2 {
+    margin: 0;
+    font-size: clamp(1.5rem, 3vw, 2rem);
+  }
+
+  .article-related__grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  @media (min-width: 700px) {
+    .article-related__grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1.25rem;
+    }
+  }
+
+  .article-related__item {
+    display: grid;
+    gap: 0.85rem;
+    color: inherit;
+    transition: transform var(--transition);
+  }
+
+  .article-related__item:hover {
+    transform: translateY(-3px);
+  }
+
+  .article-related__image {
+    display: block;
+    aspect-ratio: 16 / 10;
+    overflow: hidden;
+    background: var(--color-bg-elevated);
+  }
+
+  .article-related__image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .article-related__item:hover img {
+    transform: scale(1.05);
+  }
+
+  .article-related__title {
+    font-family: var(--font-heading);
+    font-size: 1.05rem;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  @keyframes article-kenburns {
+    from { transform: scale(1.03); }
+    to { transform: scale(1.09); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .article-hero__media img {
+      animation: none;
+      transform: none;
+    }
+
+    .article-related__image img {
+      transition: none;
+    }
   }
 </style>

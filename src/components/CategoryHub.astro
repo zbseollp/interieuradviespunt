@@ -1,0 +1,331 @@
+---
+import type { CategoryHub } from '../data/categoryHubs';
+
+interface Props {
+  hub: CategoryHub;
+}
+
+const { hub } = Astro.props;
+const letters = [...new Set(hub.items.map((item) => item.letter))].sort((a, b) => {
+  if (a === '#') return -1;
+  if (b === '#') return 1;
+  return a.localeCompare(b, 'nl');
+});
+---
+<section class="hub-hero">
+  <div class="hub-hero__media" aria-hidden="true">
+    <img src={hub.image} alt="" width="1600" height="900" loading="eager" />
+  </div>
+  <div class="hub-hero__shade" aria-hidden="true"></div>
+  <div class="container hub-hero__content">
+    <p class="hub-hero__eyebrow reveal">{hub.eyebrow}</p>
+    <h1 class="hub-hero__title reveal">{hub.title}</h1>
+    <p class="hub-hero__lead reveal">{hub.description}</p>
+    <a class="hub-hero__cta reveal" href="#producten">
+      Bekijk producten
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+    </a>
+  </div>
+</section>
+
+<nav class="hub-letters" aria-label="Spring naar letter">
+  <div class="container hub-letters__inner">
+    {letters.map((letter) => (
+      <a class="hub-letters__link" href={`#letter-${letter === '#' ? 'num' : letter}`}>{letter}</a>
+    ))}
+  </div>
+</nav>
+
+<section id="producten" class="hub-products">
+  <div class="container">
+    {letters.map((letter) => {
+      const group = hub.items.filter((item) => item.letter === letter);
+      const id = letter === '#' ? 'letter-num' : `letter-${letter}`;
+      return (
+        <div class="hub-group" id={id}>
+          <div class="hub-group__head reveal">
+            <span class="hub-group__letter">{letter}</span>
+            <span class="hub-group__count">{group.length} {group.length === 1 ? 'product' : 'producten'}</span>
+          </div>
+          <div class="hub-grid">
+            {group.map((item, index) => (
+              <a
+                href={item.href}
+                class="hub-tile reveal"
+                style={`transition-delay: ${Math.min(index, 8) * 0.04}s`}
+              >
+                <span class="hub-tile__media">
+                  <img src={item.image} alt="" width="550" height="550" loading="lazy" />
+                </span>
+                <span class="hub-tile__label">
+                  <span class="hub-tile__name">{item.label}</span>
+                  <span class="hub-tile__action" aria-hidden="true">→</span>
+                </span>
+              </a>
+            ))}
+          </div>
+        </div>
+      );
+    })}
+  </div>
+</section>
+
+<style>
+  .hub-hero {
+    position: relative;
+    min-height: clamp(22rem, 58vh, 34rem);
+    display: grid;
+    align-items: end;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  .hub-hero__media {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+  }
+
+  .hub-hero__media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scale(1.04);
+    animation: hub-kenburns 18s ease-out forwards;
+  }
+
+  .hub-hero__shade {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background:
+      linear-gradient(180deg, rgba(38, 38, 38, 0.35) 0%, rgba(38, 38, 38, 0.55) 35%, rgba(38, 38, 38, 0.96) 100%),
+      linear-gradient(90deg, rgba(38, 38, 38, 0.88) 0%, rgba(38, 38, 38, 0.35) 58%, rgba(38, 38, 38, 0.15) 100%);
+  }
+
+  .hub-hero__content {
+    position: relative;
+    padding-block: clamp(4rem, 10vw, 7rem) clamp(2.5rem, 6vw, 4rem);
+    max-width: 40rem;
+  }
+
+  .hub-hero__eyebrow {
+    margin: 0 0 0.75rem;
+    font-family: var(--font-heading);
+    font-size: 0.8125rem;
+    font-weight: 400;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--color-accent);
+  }
+
+  .hub-hero__title {
+    margin: 0 0 0.85rem;
+    font-size: clamp(2.75rem, 8vw, 5rem);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    line-height: 0.95;
+  }
+
+  .hub-hero__lead {
+    margin: 0 0 1.5rem;
+    max-width: 34rem;
+    color: var(--color-muted);
+    font-size: clamp(1rem, 1.6vw, 1.125rem);
+    line-height: 1.65;
+  }
+
+  .hub-hero__cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.85rem 1.35rem;
+    background: var(--color-accent);
+    color: var(--color-bg);
+    font-family: var(--font-heading);
+    font-size: 0.875rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    transition: background var(--transition), transform var(--transition);
+  }
+
+  .hub-hero__cta:hover {
+    background: var(--color-accent-hover);
+    transform: translateY(-1px);
+  }
+
+  .hub-letters {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: rgba(38, 38, 38, 0.92);
+    backdrop-filter: blur(10px);
+    border-block: 1px solid var(--color-border);
+  }
+
+  .hub-letters__inner {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    padding-block: 0.75rem;
+  }
+
+  .hub-letters__link {
+    min-width: 2.15rem;
+    height: 2.15rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-heading);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-muted);
+    border: 1px solid transparent;
+    transition: color var(--transition), border-color var(--transition), background var(--transition);
+  }
+
+  .hub-letters__link:hover,
+  .hub-letters__link:focus-visible {
+    color: var(--color-primary);
+    border-color: var(--color-accent);
+    background: rgba(177, 141, 77, 0.12);
+  }
+
+  .hub-products {
+    padding-block: clamp(2.5rem, 5vw, 4.5rem) clamp(3.5rem, 7vw, 6rem);
+  }
+
+  .hub-group + .hub-group {
+    margin-top: clamp(2.5rem, 5vw, 4rem);
+  }
+
+  .hub-group__head {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .hub-group__letter {
+    font-family: var(--font-heading);
+    font-size: clamp(2rem, 4vw, 2.75rem);
+    font-weight: 700;
+    line-height: 1;
+    color: var(--color-accent);
+  }
+
+  .hub-group__count {
+    font-size: 0.8125rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+
+  .hub-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  @media (min-width: 640px) {
+    .hub-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1rem;
+    }
+  }
+
+  @media (min-width: 960px) {
+    .hub-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  .hub-tile {
+    position: relative;
+    display: block;
+    overflow: hidden;
+    background: var(--color-bg-elevated);
+    aspect-ratio: 1;
+    isolation: isolate;
+  }
+
+  .hub-tile__media {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+  }
+
+  .hub-tile__media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .hub-tile::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, transparent 35%, rgba(20, 20, 20, 0.88) 100%);
+    transition: opacity var(--transition);
+  }
+
+  .hub-tile__label {
+    position: absolute;
+    inset: auto 0 0 0;
+    z-index: 1;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+
+  .hub-tile__name {
+    font-family: var(--font-heading);
+    font-size: clamp(0.95rem, 1.5vw, 1.125rem);
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: capitalize;
+    line-height: 1.2;
+  }
+
+  .hub-tile__action {
+    color: var(--color-accent);
+    font-size: 1.125rem;
+    transform: translateX(-4px);
+    opacity: 0.7;
+    transition: transform var(--transition), opacity var(--transition);
+  }
+
+  .hub-tile:hover img,
+  .hub-tile:focus-visible img {
+    transform: scale(1.06);
+  }
+
+  .hub-tile:hover .hub-tile__action,
+  .hub-tile:focus-visible .hub-tile__action {
+    transform: translateX(0);
+    opacity: 1;
+  }
+
+  @keyframes hub-kenburns {
+    from { transform: scale(1.04); }
+    to { transform: scale(1.1); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hub-hero__media img {
+      animation: none;
+      transform: none;
+    }
+
+    .hub-tile__media img {
+      transition: none;
+    }
+  }
+</style>

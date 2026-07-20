@@ -1,0 +1,313 @@
+---
+import fs from 'node:fs';
+import path from 'node:path';
+import type { CollectionEntry } from 'astro:content';
+
+interface Props {
+  posts: CollectionEntry<'blog'>[];
+  page: number;
+  totalPages: number;
+}
+
+const { posts, page, totalPages } = Astro.props;
+const exactRoot = path.join(process.cwd(), 'src/content/exact-pages');
+
+function postImage(post: CollectionEntry<'blog'>) {
+  const metaPath = path.join(exactRoot, post.id, 'meta.json');
+  if (fs.existsSync(metaPath)) {
+    try {
+      const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
+      if (meta.ogImage) return meta.ogImage as string;
+    } catch {
+      // ignore
+    }
+  }
+  return post.data.featuredImage ?? '/images/2023/05/wanddecoratie.jpg';
+}
+
+function hrefForPage(n: number) {
+  return n <= 1 ? '/blog/' : `/blog/${n}/`;
+}
+---
+<section class="bi-hero">
+  <div class="bi-hero__glow" aria-hidden="true"></div>
+  <div class="container bi-hero__content">
+    <p class="bi-hero__eyebrow reveal">Inspiratie & tips</p>
+    <h1 class="bi-hero__title reveal">Blog</h1>
+    <p class="bi-hero__lead reveal">
+      Artikelen over interieur, wonen en praktische tips. Blijf op de hoogte van trends en ideeën voor jouw huis.
+    </p>
+  </div>
+</section>
+
+<section class="bi-list">
+  <div class="container">
+    <div class="bi-grid">
+      {posts.map((post, index) => {
+        const image = postImage(post);
+        const dateLabel = post.data.pubDate.toLocaleDateString('nl-NL', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        });
+        return (
+          <a
+            href={`/${post.id}/`}
+            class="bi-card reveal"
+            style={`transition-delay: ${Math.min(index, 11) * 0.035}s`}
+          >
+            <span class="bi-card__media">
+              <img src={image} alt="" width="800" height="520" loading={index < 4 ? 'eager' : 'lazy'} />
+            </span>
+            <span class="bi-card__body">
+              <time class="bi-card__date" datetime={post.data.pubDate.toISOString()}>
+                {dateLabel}
+              </time>
+              <span class="bi-card__title">{post.data.title}</span>
+              {post.data.description && (
+                <span class="bi-card__excerpt">{post.data.description}</span>
+              )}
+              <span class="bi-card__more">
+                Lees verder
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              </span>
+            </span>
+          </a>
+        );
+      })}
+    </div>
+
+    {totalPages > 1 && (
+      <nav class="bi-pager reveal" aria-label="Blog paginering">
+        {page > 1 ? (
+          <a class="bi-pager__nav" href={hrefForPage(page - 1)}>« Vorige</a>
+        ) : (
+          <span class="bi-pager__nav bi-pager__nav--disabled">« Vorige</span>
+        )}
+
+        <ol class="bi-pager__pages">
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
+            <li>
+              {n === page ? (
+                <span class="bi-pager__page bi-pager__page--current" aria-current="page">
+                  Pagina {n}
+                </span>
+              ) : (
+                <a class="bi-pager__page" href={hrefForPage(n)}>
+                  Pagina {n}
+                </a>
+              )}
+            </li>
+          ))}
+        </ol>
+
+        {page < totalPages ? (
+          <a class="bi-pager__nav" href={hrefForPage(page + 1)}>Volgende »</a>
+        ) : (
+          <span class="bi-pager__nav bi-pager__nav--disabled">Volgende »</span>
+        )}
+      </nav>
+    )}
+  </div>
+</section>
+
+<style>
+  .bi-hero {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    padding: clamp(3.5rem, 8vw, 5.5rem) 0 clamp(2rem, 4vw, 3rem);
+    background:
+      radial-gradient(ellipse 70% 55% at 85% 10%, rgba(177, 141, 77, 0.16), transparent 55%),
+      linear-gradient(180deg, #2a2a2a 0%, var(--color-bg) 100%);
+  }
+
+  .bi-hero__glow {
+    position: absolute;
+    inset: auto 50% -50% -20%;
+    height: 80%;
+    background: radial-gradient(circle, rgba(177, 141, 77, 0.1), transparent 60%);
+    z-index: -1;
+  }
+
+  .bi-hero__content {
+    max-width: 40rem;
+  }
+
+  .bi-hero__eyebrow {
+    margin: 0 0 0.7rem;
+    font-family: var(--font-heading);
+    font-size: 0.8125rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--color-accent);
+  }
+
+  .bi-hero__title {
+    margin: 0 0 0.75rem;
+    font-size: clamp(2.75rem, 8vw, 5rem);
+    line-height: 0.95;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+
+  .bi-hero__lead {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: clamp(1rem, 1.5vw, 1.125rem);
+    line-height: 1.65;
+  }
+
+  .bi-list {
+    padding-block: clamp(1.5rem, 4vw, 2.5rem) clamp(3rem, 6vw, 5rem);
+  }
+
+  .bi-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  @media (min-width: 640px) {
+    .bi-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1.35rem;
+    }
+  }
+
+  @media (min-width: 1000px) {
+    .bi-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  .bi-card {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    color: inherit;
+    background: var(--color-bg-elevated);
+    overflow: hidden;
+    transition: transform var(--transition);
+  }
+
+  .bi-card:hover {
+    transform: translateY(-3px);
+  }
+
+  .bi-card__media {
+    display: block;
+    aspect-ratio: 16 / 10;
+    overflow: hidden;
+    background: #1f1f1f;
+  }
+
+  .bi-card__media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .bi-card:hover img {
+    transform: scale(1.05);
+  }
+
+  .bi-card__body {
+    display: grid;
+    align-content: start;
+    gap: 0.55rem;
+    padding: 1.15rem 1.15rem 1.25rem;
+  }
+
+  .bi-card__date {
+    font-family: var(--font-heading);
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-accent);
+  }
+
+  .bi-card__title {
+    font-family: var(--font-heading);
+    font-size: clamp(1.05rem, 1.6vw, 1.25rem);
+    font-weight: 600;
+    line-height: 1.25;
+    color: var(--color-primary);
+  }
+
+  .bi-card__excerpt {
+    font-size: 0.9375rem;
+    line-height: 1.55;
+    color: var(--color-muted);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .bi-card__more {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.35rem;
+    font-family: var(--font-heading);
+    font-size: 0.8125rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-accent);
+  }
+
+  .bi-pager {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: clamp(2rem, 4vw, 3rem);
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .bi-pager__pages {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .bi-pager__nav,
+  .bi-pager__page {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.4rem;
+    padding: 0.45rem 0.9rem;
+    font-family: var(--font-heading);
+    font-size: 0.8125rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+    border: 1px solid var(--color-border);
+    transition: color var(--transition), border-color var(--transition), background var(--transition);
+  }
+
+  .bi-pager__nav:hover,
+  .bi-pager__page:hover {
+    color: var(--color-primary);
+    border-color: var(--color-accent);
+    background: rgba(177, 141, 77, 0.12);
+  }
+
+  .bi-pager__page--current {
+    color: var(--color-bg);
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+  }
+
+  .bi-pager__nav--disabled {
+    opacity: 0.35;
+    pointer-events: none;
+  }
+</style>

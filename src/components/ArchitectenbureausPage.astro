@@ -1,0 +1,249 @@
+---
+interface Bureau {
+  slug: string;
+  path: string;
+  label: string;
+}
+
+interface Props {
+  entries: Bureau[];
+  description: string;
+}
+
+const { entries, description } = Astro.props;
+
+const letters = [
+  ...new Set(
+    entries.map((item) => {
+      const ch = item.label.trim().charAt(0).toUpperCase();
+      return /[A-Z]/.test(ch) ? ch : '#';
+    })
+  ),
+].sort((a, b) => {
+  if (a === '#') return -1;
+  if (b === '#') return 1;
+  return a.localeCompare(b, 'nl');
+});
+
+const grouped = letters.map((letter) => ({
+  letter,
+  id: letter === '#' ? 'ab-num' : `ab-${letter}`,
+  items: entries
+    .filter((item) => {
+      const ch = item.label.trim().charAt(0).toUpperCase();
+      const key = /[A-Z]/.test(ch) ? ch : '#';
+      return key === letter;
+    })
+    .sort((a, b) => a.label.localeCompare(b.label, 'nl')),
+}));
+---
+<section class="ab-hero">
+  <div class="ab-hero__glow" aria-hidden="true"></div>
+  <div class="container ab-hero__content">
+    <p class="ab-hero__eyebrow reveal">Directory</p>
+    <h1 class="ab-hero__title reveal">Architectenbureaus</h1>
+    <p class="ab-hero__lead reveal">{description}</p>
+    <div class="ab-hero__stat reveal">
+      <strong>{entries.length.toLocaleString('nl-NL')}</strong>
+      <span>bureaus in de lijst</span>
+    </div>
+  </div>
+</section>
+
+<nav class="ab-jump" aria-label="Spring naar letter">
+  <div class="container ab-jump__inner">
+    {letters.map((letter) => (
+      <a class="ab-jump__link" href={`#${letter === '#' ? 'ab-num' : `ab-${letter}`}`}>
+        {letter}
+      </a>
+    ))}
+  </div>
+</nav>
+
+<section class="ab-list">
+  <div class="container">
+    {grouped.map((group) => (
+      <div class="ab-group" id={group.id}>
+        <div class="ab-group__head reveal">
+          <span class="ab-group__letter">{group.letter}</span>
+          <span class="ab-group__count">{group.items.length}</span>
+        </div>
+        <div class="ab-grid">
+          {group.items.map((item) => (
+            <a href={item.path} class="ab-link">{item.label}</a>
+          ))}
+        </div>
+      </div>
+    ))}
+  </div>
+</section>
+
+<style>
+  .ab-hero {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    padding: clamp(3.5rem, 8vw, 5.75rem) 0 clamp(2rem, 4vw, 3rem);
+    background:
+      radial-gradient(ellipse 70% 55% at 90% 5%, rgba(177, 141, 77, 0.18), transparent 55%),
+      linear-gradient(180deg, #2a2a2a 0%, var(--color-bg) 100%);
+  }
+
+  .ab-hero__glow {
+    position: absolute;
+    inset: auto 40% -45% -15%;
+    height: 75%;
+    background: radial-gradient(circle, rgba(177, 141, 77, 0.1), transparent 60%);
+    z-index: -1;
+  }
+
+  .ab-hero__content {
+    max-width: 44rem;
+  }
+
+  .ab-hero__eyebrow {
+    margin: 0 0 0.7rem;
+    font-family: var(--font-heading);
+    font-size: 0.8125rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--color-accent);
+  }
+
+  .ab-hero__title {
+    margin: 0 0 0.85rem;
+    font-size: clamp(2.4rem, 7vw, 4.5rem);
+    line-height: 0.95;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+
+  .ab-hero__lead {
+    margin: 0 0 1.5rem;
+    color: var(--color-muted);
+    font-size: clamp(1rem, 1.5vw, 1.125rem);
+    line-height: 1.65;
+  }
+
+  .ab-hero__stat {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.65rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--color-border);
+    background: rgba(46, 46, 46, 0.55);
+  }
+
+  .ab-hero__stat strong {
+    font-family: var(--font-heading);
+    font-size: 1.5rem;
+    color: var(--color-accent);
+    line-height: 1;
+  }
+
+  .ab-hero__stat span {
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+
+  .ab-jump {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: rgba(38, 38, 38, 0.92);
+    backdrop-filter: blur(10px);
+    border-block: 1px solid var(--color-border);
+  }
+
+  .ab-jump__inner {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    padding-block: 0.7rem;
+  }
+
+  .ab-jump__link {
+    min-width: 2rem;
+    height: 2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-heading);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-muted);
+    border: 1px solid transparent;
+    transition: color var(--transition), border-color var(--transition), background var(--transition);
+  }
+
+  .ab-jump__link:hover,
+  .ab-jump__link:focus-visible {
+    color: var(--color-primary);
+    border-color: var(--color-accent);
+    background: rgba(177, 141, 77, 0.12);
+  }
+
+  .ab-list {
+    padding-block: clamp(1.75rem, 4vw, 2.75rem) clamp(3rem, 6vw, 5rem);
+  }
+
+  .ab-group + .ab-group {
+    margin-top: 1.85rem;
+  }
+
+  .ab-group__head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    margin-bottom: 0.8rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .ab-group__letter {
+    font-family: var(--font-heading);
+    font-size: 1.85rem;
+    font-weight: 700;
+    color: var(--color-accent);
+    line-height: 1;
+  }
+
+  .ab-group__count {
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+
+  .ab-grid {
+    columns: 1;
+    gap: 1.5rem;
+  }
+
+  @media (min-width: 700px) {
+    .ab-grid {
+      columns: 2;
+    }
+  }
+
+  @media (min-width: 1000px) {
+    .ab-grid {
+      columns: 3;
+    }
+  }
+
+  .ab-link {
+    display: block;
+    padding: 0.4rem 0;
+    color: var(--color-muted);
+    break-inside: avoid;
+    transition: color var(--transition);
+  }
+
+  .ab-link:hover,
+  .ab-link:focus-visible {
+    color: var(--color-accent);
+  }
+</style>

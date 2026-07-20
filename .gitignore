@@ -28,3 +28,9 @@ Thumbs.db
 
 # misc
 *.local
+tmp-exact-cache/
+tmp-exact-build.log
+tmp-lightbox-analysis/
+branch_structure.json
+temp_auto_push.bat
+temp_interactive_push.bat

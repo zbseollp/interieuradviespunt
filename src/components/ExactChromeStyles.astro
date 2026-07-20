@@ -1,0 +1,42 @@
+---
+/**
+ * Elementor header/footer CSS for non-product pages that use ExactHeader/ExactFooter.
+ * Omits theme reset.css so redesigned page content styles still apply.
+ */
+const chromeCss = [
+  '/css/lightbox-exact/themes__hello-elementor__assets__css__header-footer.css',
+  '/css/lightbox-exact/plugins__elementor__assets__css__frontend.min.css',
+  '/css/lightbox-exact/uploads__elementor__css__post-9.css',
+  '/css/lightbox-exact/plugins__ele-custom-skin__modules__color-scheme__assets__css__ecs-color-scheme.css',
+  '/css/lightbox-exact/plugins__ele-custom-skin__modules__container-layout__assets__css__ecs-container-layout.css',
+  '/css/lightbox-exact/plugins__ele-custom-skin__modules__mobile-menu__assets__css__ecs-mobile-menu.css',
+  '/css/lightbox-exact/plugins__elementor__assets__css__widget-image.min.css',
+  '/css/lightbox-exact/plugins__elementor-pro__assets__css__widget-nav-menu.min.css',
+  '/css/exact-nav-menu.css',
+  '/css/lightbox-exact/plugins__elementor-pro__assets__css__widget-search-form.min.css',
+  '/css/exact-search-form.css',
+  '/css/lightbox-exact/plugins__elementor__assets__lib__font-awesome__css__fontawesome.min.css',
+  '/css/lightbox-exact/plugins__elementor__assets__lib__font-awesome__css__solid.min.css',
+  '/css/lightbox-exact/plugins__elementor__assets__lib__eicons__css__elementor-icons.min.css',
+  '/css/lightbox-exact/plugins__elementor__assets__css__widget-social-icons.min.css',
+  '/css/lightbox-exact/plugins__elementor__assets__css__widget-heading.min.css',
+  '/css/lightbox-exact/plugins__elementor-pro__assets__css__widget-posts.min.css',
+  '/css/lightbox-exact/uploads__elementor__css__post-14.css',
+  '/css/lightbox-exact/uploads__elementor__css__post-11.css',
+  '/css/lightbox-exact/plugins__ele-custom-skin__assets__css__ecs-style.css',
+  '/css/lightbox-exact/uploads__elementor__google-fonts__css__oswald.css',
+  '/css/lightbox-exact/uploads__elementor__google-fonts__css__didactgothic.css',
+  '/css/lightbox-exact/uploads__elementor__google-fonts__css__roboto.css',
+  '/css/lightbox-exact/plugins__elementor__assets__lib__font-awesome__css__brands.min.css',
+];
+---
+{chromeCss.map((href) => <link rel="stylesheet" href={href} />)}
+<style is:global>
+  /* Keep Exact header/footer looking like live Elementor chrome */
+  .elementor-location-header,
+  .elementor-location-footer,
+  header[data-elementor-type="header"],
+  footer[data-elementor-type="footer"] {
+    font-family: "Didact Gothic", sans-serif;
+  }
+</style>
