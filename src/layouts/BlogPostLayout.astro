@@ -1,4 +1,7 @@
 ---
+import { resolveFeaturedImage, resolveFeaturedImageAlt } from '../lib/blogImages';
+import { resolveMediaUrl } from '../lib/media-url.mjs';
+import { SITE_FALLBACK_IMAGE } from '../lib/site-image';
 import type { CollectionEntry } from 'astro:content';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,11 +20,12 @@ const exactMeta = fs.existsSync(metaPath)
   ? JSON.parse(fs.readFileSync(metaPath, 'utf-8'))
   : null;
 
+// Resolve rather than trusting the raw field: Payload writes /media/... paths
+// and media objects, neither of which is a valid src on this site.
 const featuredImage =
-  exactMeta?.ogImage ||
-  entry.data.featuredImage ||
-  '/images/2023/05/wanddecoratie.jpg';
-const imageAlt = entry.data.imageAlt ?? entry.data.title;
+  resolveMediaUrl(exactMeta?.ogImage, { fallback: null }) ||
+  resolveFeaturedImage(entry.data, entry.body, { fallback: SITE_FALLBACK_IMAGE });
+const imageAlt = resolveFeaturedImageAlt(entry.data, entry.data.title);
 const formattedDate = entry.data.pubDate.toLocaleDateString('nl-NL', {
   year: 'numeric',
   month: 'long',

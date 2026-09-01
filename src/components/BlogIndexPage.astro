@@ -1,4 +1,7 @@
 ---
+import { resolveFeaturedImage } from '../lib/blogImages';
+import { resolveMediaUrl } from '../lib/media-url.mjs';
+import { SITE_FALLBACK_IMAGE } from '../lib/site-image';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { CollectionEntry } from 'astro:content';
@@ -17,12 +20,12 @@ function postImage(post: CollectionEntry<'blog'>) {
   if (fs.existsSync(metaPath)) {
     try {
       const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
-      if (meta.ogImage) return meta.ogImage as string;
+      if (meta.ogImage) return resolveMediaUrl(meta.ogImage, { fallback: meta.ogImage }) as string;
     } catch {
       // ignore
     }
   }
-  return post.data.featuredImage ?? '/images/2023/05/wanddecoratie.jpg';
+  return resolveFeaturedImage(post.data, post.body, { fallback: SITE_FALLBACK_IMAGE });
 }
 
 function hrefForPage(n: number) {

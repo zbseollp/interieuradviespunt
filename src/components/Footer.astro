@@ -1,11 +1,9 @@
 ---
-import { getCollection } from 'astro:content';
+import { getBlogPosts } from '../lib/blog';
 import { footerCategories } from '../data/categories';
 import { socialLinks } from '../data/navigation';
 
-const recentPosts = (await getCollection('blog'))
-  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
-  .slice(0, 6);
+const recentPosts = (await getBlogPosts()).slice(0, 6);
 ---
 <footer class="footer">
   <div class="container footer__share reveal">

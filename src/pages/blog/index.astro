@@ -1,14 +1,12 @@
 ---
-import { getCollection } from 'astro:content';
+import { getBlogPosts } from '../../lib/blog';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import ExactHeader from '../../components/ExactHeader.astro';
 import ExactFooter from '../../components/ExactFooter.astro';
 import BlogIndexPage from '../../components/BlogIndexPage.astro';
 
 const PER_PAGE = 32;
-const allPosts = (await getCollection('blog')).sort(
-  (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
-);
+const allPosts = await getBlogPosts();
 const totalPages = Math.max(1, Math.ceil(allPosts.length / PER_PAGE));
 const page = 1;
 const posts = allPosts.slice(0, PER_PAGE);

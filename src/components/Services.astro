@@ -1,10 +1,10 @@
 ---
-import { getCollection } from 'astro:content';
+import { resolveFeaturedImage } from '../lib/blogImages';
+import { SITE_FALLBACK_IMAGE } from '../lib/site-image';
+import { getBlogPosts } from '../lib/blog';
 import BlogCard from './BlogCard.astro';
 
-const posts = (await getCollection('blog'))
-  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
-  .slice(0, 8);
+const posts = (await getBlogPosts()).slice(0, 8);
 ---
 <section class="services section">
   <div class="container">
@@ -21,7 +21,7 @@ const posts = (await getCollection('blog'))
           <BlogCard
             title={post.data.title}
             href={`/${post.id}/`}
-            image={post.data.featuredImage ?? '/images/2023/05/wanddecoratie.jpg'}
+            image={resolveFeaturedImage(post.data, post.body, { fallback: SITE_FALLBACK_IMAGE })}
             date={post.data.pubDate.toISOString().slice(0, 10)}
             excerpt={post.data.description}
           />
