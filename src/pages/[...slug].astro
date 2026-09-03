@@ -1,5 +1,6 @@
 ---
 import { getBlogPosts } from '../lib/blog';
+import { resolveFeaturedImage } from '../lib/blogImages';
 import { getCollection, render } from 'astro:content';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -186,7 +187,8 @@ const relatedPosts =
         .map((post) => ({
           title: post.data.title,
           href: `/${post.id}/`,
-          image: post.data.featuredImage ?? '/images/2023/05/wanddecoratie.jpg',
+          image:
+            resolveFeaturedImage(post.data, post.body) ?? '/images/2023/05/wanddecoratie.jpg',
         }))
     : [];
 
