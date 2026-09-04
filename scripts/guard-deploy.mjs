@@ -25,6 +25,41 @@ import { join } from 'node:path';
 const asJson = process.argv.includes('--json');
 const allowLoss = process.env.ALLOW_CONTENT_LOSS === '1';
 
+/**
+ * Intentional malware takedown: source still exists but is `draft: true` with
+ * `_spam:` — those live URLs are allowed to disappear from the next deploy.
+ * Also allows paths listed in `.allow-url-drop` (one path per line).
+ */
+function allowUrlDropSet() {
+  const file = '.allow-url-drop';
+  if (!existsSync(file)) return new Set();
+  return new Set(
+    readFileSync(file, 'utf8')
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith('#'))
+      .map((l) => (l.startsWith('/') ? l : `/${l}`))
+      .map((l) => (l.endsWith('/') ? l : `${l}/`)),
+  );
+}
+
+const ALLOW_DROPS = allowUrlDropSet();
+
+function isIntentionalSpamDrop(urlPath) {
+  const normalized = urlPath.endsWith('/') ? urlPath : `${urlPath}/`;
+  if (ALLOW_DROPS.has(normalized)) return true;
+
+  const slug = urlPath.replace(/^\/+|\/+$/g, '').split('/').pop();
+  if (!slug) return false;
+  for (const ext of ['.mdx', '.md']) {
+    const file = join('src/content/blog', `${slug}${ext}`);
+    if (!existsSync(file)) continue;
+    const raw = readFileSync(file, 'utf8');
+    return /^draft:\s*true\b/m.test(raw) && /^_spam:/m.test(raw);
+  }
+  return false;
+}
+
 function siteOrigin() {
   for (const f of ['astro.config.mjs', 'astro.config.ts']) {
     if (!existsSync(f)) continue;
@@ -104,7 +139,12 @@ for (const m of html.matchAll(/href="(?:https?:\/\/[^/]+)?(\/[a-z0-9][a-z0-9-]{6
 const candidates = [...liveLinks].filter((u) => !built.has(u)).sort();
 const missing = [];
 const alreadyDead = [];
+const intentionalSpam = [];
 for (const u of candidates) {
+  if (isIntentionalSpamDrop(u)) {
+    intentionalSpam.push(u);
+    continue;
+  }
   let ok = false;
   try {
     const res = await fetch(origin + u, { redirect: 'follow', signal: AbortSignal.timeout(20000) });
@@ -113,6 +153,12 @@ for (const u of candidates) {
     ok = false; // unreachable → treat as dead rather than blocking the deploy
   }
   (ok ? missing : alreadyDead).push(u);
+}
+if (intentionalSpam.length > 0) {
+  console.log(
+    `[guard-deploy] allowing ${intentionalSpam.length} intentional spam draft drop(s): ` +
+      intentionalSpam.slice(0, 5).join(', ') + (intentionalSpam.length > 5 ? ' …' : ''),
+  );
 }
 if (alreadyDead.length > 0) {
   console.log(

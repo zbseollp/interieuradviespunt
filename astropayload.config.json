@@ -1,6 +1,7 @@
 {
   "version": 1,
   "tenantSlug": "interieuradviespunt",
+  "githubRepo": "zbseollp/interieuradviespunt",
   "modules": [
     "blog"
   ],

@@ -1,12 +1,8 @@
 #!/usr/bin/env node
 /**
- * Flag hard-spam posts (injected scripts, redirect payloads) as drafts, and
- * REPORT off-topic gossip filler without touching it. Nothing is ever deleted:
- * the files stay on disk and the loader filters drafts out of the build.
- *
- * Deliberately not spam: <iframe>/<script src> embeds (YouTube players, social
- * widgets) and images on a third-party CDN. Both appear in real articles;
- * treating them as injection deletes legitimate posts.
+ * Flag hard-spam posts (injected scripts, casino SEO, SMM/affiliate) as drafts,
+ * and REPORT off-topic gossip filler without touching it. Nothing is ever
+ * deleted: the files stay on disk and the loader filters drafts out of the build.
  *
  *   node scripts/remove-spam-blog.mjs                 mark hard spam as draft, report off-topic
  *   node scripts/remove-spam-blog.mjs --dry-run       report only, delete nothing
@@ -30,6 +26,23 @@ const INJECTION_PATTERNS = [
   /window\s*\.\s*location\s*(?:\.\s*(?:href|replace)\s*[=(]|\s*=)/i,
   /<meta[^>]+http-equiv=["']?refresh["']?[^>]*url=/i,
 ];
+
+const CASINO_PATTERNS = [
+  /(?:^|-)(?:online-)?casinos?(?:-|$)/i,
+  /(?:^|-)(?:luxecasino|crypto-casino|casino-bonus|gokspellen|goksites|gokken)(?:-|$)/i,
+  /\b(?:casino'?s?|online\s+casino|crypto\s+casino|luxecasino|gokken|free\s*spins)\b/i,
+];
+
+const SMM_PATTERNS = [
+  /(?:^|-)(?:youtube-(?:views|abonnees)|instagram-volgers|snapchat-views|tiktok-(?:views|volgers)|live-kijkers-voor-tiktok)(?:-|$)/i,
+  /(?:^|-)(?:koop(?:-je)?-(?:live-)?(?:volgers|kijkers|views|likes)|volgers-kopen|views-kopen)(?:-|$)/i,
+  /\b(?:youtube[- ]?(?:views|abonnees)\s+kopen|instagram\s+volgers\s+(?:kopen|regelen)|snapchat[- ]?views\s+kopen|tiktok[- ]?(?:views|volgers|live\s+kijkers)\s+kopen)\b/i,
+  /\b(?:het\s+kopen\s+van\s+youtube|hoe\s+koop\s+je\s+live\s+kijkers)\b/i,
+];
+
+const AFFILIATE_HOST_RE =
+  /(?:https?:\/\/)?(?:www\.)?(?:followfactory\.nl|likefabriek\.nl|socialvolgerskopen\.nl|volgersparadijs\.nl|likesgenerator\.nl|likeskopenanoniem\.nl|snellevolgers\.nl|99likes\.nl)\b/i;
+
 const OFF_TOPIC_TITLE_PATTERNS = [
   /\bvriendin\b/i,
   /\bvriend van\b/i,
@@ -39,6 +52,23 @@ const OFF_TOPIC_TITLE_PATTERNS = [
   /\bzwanger\b/i,
   /\b(?:vermogen|lengte|leeftijd) van\b/i,
 ];
+
+function hardSpamReason(slug, title, body) {
+  const haystack = `${slug}\n${title}\n${body}`;
+  if (INJECTION_PATTERNS.some((p) => p.test(haystack))) {
+    return 'injected script/redirect payload';
+  }
+  if (CASINO_PATTERNS.some((p) => p.test(`${slug}\n${title}`))) {
+    return 'casino/gambling SEO spam';
+  }
+  if (SMM_PATTERNS.some((p) => p.test(`${slug}\n${title}`))) {
+    return 'SMM buy-followers/views spam';
+  }
+  if (AFFILIATE_HOST_RE.test(body)) {
+    return 'SMM/affiliate cloaking host in body';
+  }
+  return null;
+}
 
 if (!exists(BLOG_DIR)) {
   console.log(`[remove-spam-blog] no ${BLOG_DIR}/ — nothing to do`);
@@ -51,10 +81,10 @@ const offTopic = [];
 for (const path of listBlogFiles()) {
   const post = readPost(path);
   const title = readField(post.frontmatter, 'title') ?? '';
-  const haystack = `${post.slug}\n${title}\n${post.body}`;
+  const reason = hardSpamReason(post.slug, title, post.body);
 
-  if (INJECTION_PATTERNS.some((p) => p.test(haystack))) {
-    spam.push({ path, title, reason: 'injected script/redirect payload' });
+  if (reason) {
+    spam.push({ path, title, reason });
     continue;
   }
   if (OFF_TOPIC_TITLE_PATTERNS.some((p) => p.test(`${post.slug.replace(/-/g, ' ')} ${title}`))) {

@@ -9,6 +9,55 @@
  */
 import { z } from 'astro:content';
 
+/**
+ * Parse CMS dates without dropping the post.
+ * Accepts ISO, `YYYY-MM-DD HH:mm:ss` (WordPress), and Date objects.
+ */
+export function parseLooseDate(value: unknown): Date | undefined {
+  if (value === null || value === undefined || value === '') return undefined;
+  if (value instanceof Date) {
+    return Number.isNaN(value.valueOf()) ? undefined : value;
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const d = new Date(value);
+    return Number.isNaN(d.valueOf()) ? undefined : d;
+  }
+  const raw = String(value).trim();
+  if (!raw) return undefined;
+
+  const direct = new Date(raw);
+  if (!Number.isNaN(direct.valueOf())) return direct;
+
+  // WordPress / MySQL: "2022-05-26 06:57:42" — treat as UTC-ish local parse
+  const m = raw.match(
+    /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/,
+  );
+  if (m) {
+    const d = new Date(
+      Number(m[1]),
+      Number(m[2]) - 1,
+      Number(m[3]),
+      Number(m[4]),
+      Number(m[5]),
+      Number(m[6] || 0),
+    );
+    if (!Number.isNaN(d.valueOf())) return d;
+  }
+
+  const dateOnly = raw.match(/^(\d{4})[./-](\d{2})[./-](\d{2})$/);
+  if (dateOnly) {
+    const d = new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]));
+    if (!Number.isNaN(d.valueOf())) return d;
+  }
+
+  return undefined;
+}
+
+export const looseDateField = z.preprocess((value) => {
+  const parsed = parseLooseDate(value);
+  return parsed ?? undefined;
+}, z.date().optional());
+
 /** `/media/x.jpg`, `https://…`, or `{ url, filename, alt }`. */
 export const imageField = z
   .union([

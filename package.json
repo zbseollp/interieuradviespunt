@@ -7,14 +7,14 @@
   },
   "scripts": {
     "dev": "npm run prepare:blog && astro dev",
-    "build": "npm run prepare:blog && astro build",
+    "build": "node scripts/assert-publish-ready.mjs && npm run prepare:blog && astro build && node scripts/assert-publish-ready.mjs --dist && node scripts/guard-deploy.mjs",
     "preview": "astro preview",
     "astro": "astro",
     "migrate": "python3 scripts/migrate-wordpress.py",
     "fetch-products": "PYTHONUNBUFFERED=1 python3 scripts/fetch-product-pages.py",
     "prepare:blog": "node scripts/assert-blog-count.mjs --snapshot && node scripts/remove-spam-blog.mjs && node scripts/sanitize-blog.mjs && node scripts/validate-blog.mjs && node scripts/assert-blog-count.mjs --verify",
     "guard:deploy": "node scripts/guard-deploy.mjs",
-    "deploy": "npm run build && node scripts/guard-deploy.mjs && wrangler deploy"
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "@astrojs/mdx": "^4.2.0",

@@ -3,20 +3,16 @@
  *
  * Two tiers, deliberately separated:
  *
- * - isSpamBlogPost()      hard signals only — payloads that hijack the page:
- *                         document.write, eval of base64-decoded data, and location
- *                         assignments. Safe to filter automatically.
- * - isOffTopicBlogPost()  soft signal — celebrity/gossip filler pushed onto a
- *                         niche site. Reported by scripts/remove-spam-blog.mjs
- *                         for review; never auto-deleted, because "is this on
- *                         topic" is an editorial call, not a mechanical one.
+ * - isSpamBlogPost()      hard signals — page-hijack payloads, casino SEO,
+ *                         and SMM/affiliate "buy followers/views" spam.
+ *                         Safe to filter / draft automatically.
+ * - isOffTopicBlogPost()  soft signal — celebrity/gossip filler. Reported by
+ *                         scripts/remove-spam-blog.mjs for review; never
+ *                         auto-deleted (editorial call).
  *
  * Deliberately NOT spam signals:
- *  - <iframe> and <script src=...> embeds. YouTube players, Twitter widgets and
- *    the like are ordinary article content; treating them as injection deletes
- *    real posts. Inline injection payloads are stripped by sanitize-blog.mjs.
- *  - Images hosted on a third-party CDN. That is an image-resolution concern,
- *    handled by the media resolver, not a reason to drop the article.
+ *  - <iframe> and <script src=...> embeds (YouTube, social widgets).
+ *  - Images on a third-party CDN.
  */
 
 /** Payloads that hijack the page and must never reach the built HTML. */
@@ -27,6 +23,25 @@ const INJECTION_PATTERNS: RegExp[] = [
   /window\s*\.\s*location\s*(?:\.\s*(?:href|replace)\s*[=(]|\s*=)/i,
   /<meta[^>]+http-equiv=["']?refresh["']?[^>]*url=/i,
 ];
+
+/** Casino / gambling SEO spam (slug or title). */
+const CASINO_PATTERNS: RegExp[] = [
+  /(?:^|-)(?:online-)?casinos?(?:-|$)/i,
+  /(?:^|-)(?:luxecasino|crypto-casino|casino-bonus|gokspellen|goksites|gokken)(?:-|$)/i,
+  /\b(?:casino'?s?|online\s+casino|crypto\s+casino|luxecasino|gokken|free\s*spins)\b/i,
+];
+
+/** Buy-followers / views / streams SMM spam (slug or title). */
+const SMM_PATTERNS: RegExp[] = [
+  /(?:^|-)(?:youtube-(?:views|abonnees)|instagram-volgers|snapchat-views|tiktok-(?:views|volgers)|live-kijkers-voor-tiktok)(?:-|$)/i,
+  /(?:^|-)(?:koop(?:-je)?-(?:live-)?(?:volgers|kijkers|views|likes)|volgers-kopen|views-kopen)(?:-|$)/i,
+  /\b(?:youtube[- ]?(?:views|abonnees)\s+kopen|instagram\s+volgers\s+(?:kopen|regelen)|snapchat[- ]?views\s+kopen|tiktok[- ]?(?:views|volgers|live\s+kijkers)\s+kopen)\b/i,
+  /\b(?:het\s+kopen\s+van\s+youtube|hoe\s+koop\s+je\s+live\s+kijkers)\b/i,
+];
+
+/** Known Dutch SMM/affiliate cloaking hosts — body match = hard spam. */
+const AFFILIATE_HOST_RE =
+  /(?:https?:\/\/)?(?:www\.)?(?:followfactory\.nl|likefabriek\.nl|socialvolgerskopen\.nl|volgersparadijs\.nl|likesgenerator\.nl|likeskopenanoniem\.nl|snellevolgers\.nl|99likes\.nl)\b/i;
 
 /** Gossip-filler title shapes (Dutch), used for reporting only. */
 const OFF_TOPIC_TITLE_PATTERNS: RegExp[] = [
@@ -43,12 +58,29 @@ export function hasInjectedPayload(body: string): boolean {
   return INJECTION_PATTERNS.some((pattern) => pattern.test(body));
 }
 
+function hasCasinoSpam(haystack: string): boolean {
+  return CASINO_PATTERNS.some((pattern) => pattern.test(haystack));
+}
+
+function hasSmmSpam(haystack: string): boolean {
+  return SMM_PATTERNS.some((pattern) => pattern.test(haystack));
+}
+
+function hasAffiliateHost(body: string): boolean {
+  return AFFILIATE_HOST_RE.test(body);
+}
+
 /**
  * Hard spam — filtered out of every listing and route.
  * Checks slug, title and body so title-only spam is caught too.
  */
 export function isSpamBlogPost(id: string, body = '', title = ''): boolean {
-  return hasInjectedPayload(`${id}\n${title}\n${body}`);
+  const haystack = `${id}\n${title}\n${body}`;
+  if (hasInjectedPayload(haystack)) return true;
+  if (hasCasinoSpam(`${id}\n${title}`)) return true;
+  if (hasSmmSpam(`${id}\n${title}`)) return true;
+  if (hasAffiliateHost(body)) return true;
+  return false;
 }
 
 /** Soft signal — off-topic gossip filler. Reported, never auto-removed. */

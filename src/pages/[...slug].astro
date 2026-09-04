@@ -31,6 +31,12 @@ type SitemapEntry = {
 export async function getStaticPaths() {
   // Same publish filters as the listings — live in both places or neither.
   const blogEntries = await getBlogPosts();
+  // Draft / hard-spam posts must stay covered so their exact-page HTML copies
+  // are not resurrected via the legacy path when the MDX route is hidden.
+  const allBlog = await getCollection('blog');
+  const unpublishedBlogIds = allBlog
+    .filter((entry) => !blogEntries.some((live) => live.id === entry.id))
+    .map((entry) => entry.id);
   const pageEntries = await getCollection('pages');
   const exactRoot = path.join(process.cwd(), 'src/content/exact-pages');
   const categorySlugs = new Set(Object.keys(categoryHubs));
@@ -45,6 +51,7 @@ export async function getStaticPaths() {
 
   const covered = new Set([
     ...blogEntries.map((e) => e.id),
+    ...unpublishedBlogIds,
     ...pageEntries.map((e) => e.id),
     'contact',
     'blog',
@@ -174,9 +181,16 @@ const blogBodyHtml =
   props.type === 'blog' ? extractBlogBody(props.entry.id) : null;
 
 const allBlogEntries =
-  props.type === 'blog' || props.type === 'category'
+  props.type === 'blog' || props.type === 'category' || isSitemapPage
     ? await getBlogPosts()
     : [];
+
+const publishedBlogIds = new Set(allBlogEntries.map((post) => post.id));
+const sitemapEntriesForPage = isSitemapPage
+  ? allSitemapEntries.filter(
+      (entry) => entry.kind !== 'blog' || publishedBlogIds.has(entry.slug),
+    )
+  : allSitemapEntries;
 
 const relatedPosts =
   props.type === 'blog'
@@ -257,7 +271,7 @@ const productHtml =
     description="Overzicht van alle pagina's, producten, artikelen en directory-items op Interieuradviespunt.nl."
   >
     <ExactHeader slot="header" />
-    <SitemapPage entries={allSitemapEntries} />
+    <SitemapPage entries={sitemapEntriesForPage} />
     <ExactFooter slot="footer" />
   </BaseLayout>
 )}

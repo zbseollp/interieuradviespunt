@@ -4,6 +4,13 @@ import { isSpamBlogPost } from './spam-blog';
 /** Posts per page on the blog archive. */
 export const BLOG_PAGE_SIZE = 12;
 
+/**
+ * CMS clocks / scheduled publish can sit a few hours ahead of the build host.
+ * Dropping those posts would make Payload edits "not appear" on the live site.
+ * Must match scripts/assert-publish-ready.mjs FUTURE_SLACK_MS.
+ */
+export const FUTURE_SLACK_MS = 48 * 60 * 60 * 1000;
+
 type Post = CollectionEntry<'blog'>;
 
 /**
@@ -27,7 +34,12 @@ function timestamp(post: Post): number {
 export function isPublished(post: Post): boolean {
   if (post.data.draft) return false;
   if (post.data._status && post.data._status !== 'published') return false;
+  const publishStatus = (post.data as { publishStatus?: string }).publishStatus;
+  if (publishStatus && !/^publish/i.test(publishStatus)) return false;
   if (isSpamBlogPost(post.id, post.body ?? '', post.data.title ?? '')) return false;
+
+  const t = timestamp(post);
+  if (t > Date.now() + FUTURE_SLACK_MS) return false;
   return true;
 }
 
