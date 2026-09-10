@@ -123,10 +123,10 @@ function liveSlugs() {
     if (!/\.mdx?$/.test(name)) continue;
     const raw = readFileSync(join(BLOG, name), 'utf8');
     if (/^draft:\s*true\b/m.test(raw)) continue;
-    const status =
-      raw.match(/^publishStatus:\s*["']?(\w+)/m)?.[1] ??
-      raw.match(/^_status:\s*["']?(\w+)/m)?.[1] ??
-      'published';
+    if (/^_spam:/m.test(raw)) continue;
+    const publishStatus = raw.match(/^publishStatus:\s*["']?(\w+)/m)?.[1];
+    const wpStatus = raw.match(/^_status:\s*["']?(\w+)/m)?.[1];
+    const status = publishStatus || wpStatus || 'published';
     if (!/^publish/i.test(status)) continue;
 
     const fm = (raw.match(/^---\r?\n([\s\S]*?)\r?\n---/) || [])[1] || '';

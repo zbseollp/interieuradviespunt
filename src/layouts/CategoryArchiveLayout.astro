@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { CollectionEntry } from 'astro:content';
+import { postHref } from '../lib/blog';
 
 interface Entry {
   slug: string;
@@ -33,7 +34,7 @@ const canonical = `https://interieuradviespunt.nl/category/${categorySlug}/`;
 const postItems = posts
   .map(
     (post) =>
-      `<li><a href="/${post.id}/">${post.data.title
+      `<li><a href="${postHref(post)}">${post.data.title
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')}</a></li>`

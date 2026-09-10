@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Fail the build early on frontmatter that would drop a post from the
- * collection (missing title) instead of letting Astro report it as an opaque
- * schema error mid-build.
+ * Fail the build only on a missing frontmatter block. Missing titles, dates
+ * and descriptions are warnings — the schema falls back so the post still
+ * comes online instead of vanishing mid-build.
  *
  * Odd / missing dates are warnings only — looseDateField + a Date(0) fallback
  * keep those posts in the build so they still come online.
@@ -29,7 +29,7 @@ for (const path of files) {
 
   const title = readField(post.frontmatter, 'title');
   if (!title || title === '|' || title === '>') {
-    errors.push(`${path}: missing title`);
+    warnings.push(`${path}: missing title (schema will fall back so the post still comes online)`);
   }
 
   const isSpamDraft =

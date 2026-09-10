@@ -2,6 +2,7 @@
 import { resolveFeaturedImage } from '../lib/blogImages';
 import { resolveMediaUrl } from '../lib/media-url.mjs';
 import { SITE_FALLBACK_IMAGE } from '../lib/site-image';
+import { postHref, postExcerpt } from '../lib/blog';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { CollectionEntry } from 'astro:content';
@@ -10,12 +11,16 @@ interface Props {
   posts: CollectionEntry<'blog'>[];
   page: number;
   totalPages: number;
+  listingBase?: string;
 }
 
-const { posts, page, totalPages } = Astro.props;
+const { posts, page, totalPages, listingBase = '/blog' } = Astro.props;
 const exactRoot = path.join(process.cwd(), 'src/content/exact-pages');
+const base = listingBase.replace(/\/+$/, '');
 
 function postImage(post: CollectionEntry<'blog'>) {
+  const fromPayload = resolveFeaturedImage(post.data, post.body, { fallback: null });
+  if (fromPayload) return fromPayload;
   const metaPath = path.join(exactRoot, post.id, 'meta.json');
   if (fs.existsSync(metaPath)) {
     try {
@@ -25,11 +30,11 @@ function postImage(post: CollectionEntry<'blog'>) {
       // ignore
     }
   }
-  return resolveFeaturedImage(post.data, post.body, { fallback: SITE_FALLBACK_IMAGE });
+  return SITE_FALLBACK_IMAGE;
 }
 
 function hrefForPage(n: number) {
-  return n <= 1 ? '/blog/' : `/blog/${n}/`;
+  return n <= 1 ? `${base}/` : `${base}/${n}/`;
 }
 ---
 <section class="bi-hero">
@@ -55,7 +60,7 @@ function hrefForPage(n: number) {
         });
         return (
           <a
-            href={`/${post.id}/`}
+            href={postHref(post)}
             class="bi-card reveal"
             style={`transition-delay: ${Math.min(index, 11) * 0.035}s`}
           >
@@ -67,8 +72,8 @@ function hrefForPage(n: number) {
                 {dateLabel}
               </time>
               <span class="bi-card__title">{post.data.title}</span>
-              {post.data.description && (
-                <span class="bi-card__excerpt">{post.data.description}</span>
+              {(post.data.description || postExcerpt(post)) && (
+                <span class="bi-card__excerpt">{postExcerpt(post)}</span>
               )}
               <span class="bi-card__more">
                 Lees verder

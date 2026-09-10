@@ -1,6 +1,7 @@
 ---
-import { getBlogPosts } from '../lib/blog';
+import { getBlogPosts, matchesCategory, postHref, extraRouteSlugs } from '../lib/blog';
 import { resolveFeaturedImage } from '../lib/blogImages';
+import BlogIndexPage from '../components/BlogIndexPage.astro';
 import { getCollection, render } from 'astro:content';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -44,17 +45,24 @@ export async function getStaticPaths() {
     fs.readFileSync(path.join(process.cwd(), 'src/data/sitemapEntries.json'), 'utf-8')
   ) as SitemapEntry[];
 
-  const blogPaths = blogEntries.map((entry) => ({
-    params: { slug: entry.id },
-    props: { type: 'blog' as const, entry },
-  }));
+  const occupied = new Set(blogEntries.map((entry) => entry.id));
+  const blogPaths = blogEntries.flatMap((entry) => {
+    const routes = [{ params: { slug: entry.id }, props: { type: 'blog' as const, entry } }];
+    for (const alias of extraRouteSlugs(entry)) {
+      if (occupied.has(alias)) continue;
+      occupied.add(alias);
+      routes.push({ params: { slug: alias }, props: { type: 'blog' as const, entry } });
+    }
+    return routes;
+  });
 
   const covered = new Set([
-    ...blogEntries.map((e) => e.id),
+    ...blogEntries.flatMap((e) => [e.id, ...extraRouteSlugs(e)]),
     ...unpublishedBlogIds,
     ...pageEntries.map((e) => e.id),
     'contact',
     'blog',
+    'category/blog',
     'home',
     'beste-lightbox',
   ]);
@@ -167,29 +175,21 @@ const exactSlug =
     : null;
 const isExact = Boolean(exactSlug);
 
-function extractBlogBody(slug: string): string | null {
-  const file = path.join(exactRoot, slug, 'page.html');
-  if (!fs.existsSync(file)) return null;
-  const html = fs.readFileSync(file, 'utf-8');
-  const match = html.match(
-    /<div[^>]*class="[^"]*page-content[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<\/main>/i
-  );
-  return match ? match[1].trim() : null;
-}
-
-const blogBodyHtml =
-  props.type === 'blog' ? extractBlogBody(props.entry.id) : null;
-
 const allBlogEntries =
   props.type === 'blog' || props.type === 'category' || isSitemapPage
     ? await getBlogPosts()
     : [];
 
-const publishedBlogIds = new Set(allBlogEntries.map((post) => post.id));
 const sitemapEntriesForPage = isSitemapPage
-  ? allSitemapEntries.filter(
-      (entry) => entry.kind !== 'blog' || publishedBlogIds.has(entry.slug),
-    )
+  ? [
+      ...allSitemapEntries.filter((entry) => entry.kind !== 'blog'),
+      ...allBlogEntries.map((post) => ({
+        slug: post.id,
+        path: postHref(post),
+        label: post.data.title,
+        kind: 'blog',
+      })),
+    ]
   : allSitemapEntries;
 
 const relatedPosts =
@@ -200,7 +200,7 @@ const relatedPosts =
         .slice(0, 3)
         .map((post) => ({
           title: post.data.title,
-          href: `/${post.id}/`,
+          href: postHref(post),
           image:
             resolveFeaturedImage(post.data, post.body) ?? '/images/2023/05/wanddecoratie.jpg',
         }))
@@ -213,12 +213,10 @@ const categoryTitle =
     : '';
 const categoryPosts =
   props.type === 'category'
-    ? allBlogEntries.filter((post) =>
-        (post.data.categories ?? []).some(
-          (cat) => cat.toLowerCase() === categoryName.toLowerCase()
-        )
-      )
+    ? allBlogEntries.filter((post) => matchesCategory(post, categoryName))
     : [];
+const isBlogCategory = props.type === 'category' && categoryName.toLowerCase() === 'blog';
+const blogCategoryTotalPages = Math.max(1, Math.ceil(categoryPosts.length / 32));
 
 const entryIndex =
   props.type === 'sitemap-entry'
@@ -235,7 +233,7 @@ const relatedEntries =
 const legacyPage = props.type === 'legacy' ? createFallbackPage(props.slug) : null;
 
 const { Content } =
-  (props.type === 'blog' && !blogBodyHtml) ||
+  props.type === 'blog' ||
   (props.type === 'page' &&
     !isExact &&
     !categoryHub &&
@@ -293,14 +291,22 @@ const productHtml =
 {exactSlug && <ExactElementorLayout slug={exactSlug} />}
 
 {props.type === 'blog' && (
-  <BlogPostLayout entry={props.entry} bodyHtml={blogBodyHtml} related={relatedPosts}>
+  <BlogPostLayout entry={props.entry} related={relatedPosts}>
     <ExactHeader slot="header" />
     {Content && <Content />}
     <ExactFooter slot="footer" />
   </BlogPostLayout>
 )}
 
-{props.type === 'category' && (
+{isBlogCategory && (
+  <BaseLayout title="Blog" description="Artikelen en blogs over interieur op Interieuradviespunt.nl">
+    <ExactHeader slot="header" />
+    <BlogIndexPage posts={categoryPosts.slice(0, 32)} page={1} totalPages={blogCategoryTotalPages} listingBase="/category/blog" />
+    <ExactFooter slot="footer" />
+  </BaseLayout>
+)}
+
+{props.type === 'category' && !isBlogCategory && (
   <CategoryArchiveLayout
     categorySlug={categoryName}
     title={categoryTitle}

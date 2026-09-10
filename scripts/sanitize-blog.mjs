@@ -13,6 +13,7 @@
 import { writeFileSync } from 'node:fs';
 import { resolveMediaUrl } from '../src/lib/media-url.mjs';
 import { BLOG_DIR, exists, listBlogFiles, readPost } from './lib/blog-files.mjs';
+import { sanitizeMdxBody } from './lib/mdx-sanitize.mjs';
 
 const IMAGE_FIELDS = ['featuredImage', 'heroImage', 'image', 'ogImage'];
 
@@ -55,6 +56,21 @@ function normalizeHybridMarkdown(body) {
     .replace(/(#{1,6}\s+[^\n<]+)\s*<br\s*\/?>\s*/gi, '$1\n\n')
     // Leftover single <br> right after a heading blank line.
     .replace(/(^|\n)(#{1,6}\s+[^\n]+)\n+\s*<br\s*\/?>\s*/gi, '$1$2\n\n');
+}
+
+/**
+ * WordPress Elementor leftovers that used to ride in via exact-page HTML:
+ * "Hoe ga je te werk?" author box, "Inhoud", "Nieuwe blogs". They are not
+ * article body — they made Payload MDX look unfinished after we stopped
+ * preferring the scraped HTML.
+ */
+function stripWordpressChrome(body) {
+  let next = body.replace(
+    /\n#{1,6}\s*Hoe ga je te werk\?[\s\S]*$/i,
+    '\n',
+  );
+  next = next.replace(/\n+(?:Inhoud|Nieuwe blogs)\s*$/gim, '\n');
+  return next.replace(/\n{3,}/g, '\n\n').trimEnd() + '\n';
 }
 
 if (!exists(BLOG_DIR)) {
@@ -116,13 +132,13 @@ for (const path of listBlogFiles()) {
     )
     .replace(/^.*document\s*\.\s*write\s*\([\s\S]*?\).*$/gim, '');
 
-  body = normalizeHybridMarkdown(body);
+  body = sanitizeMdxBody(stripWordpressChrome(normalizeHybridMarkdown(body)));
 
   const next = `---\n${frontmatter}\n---\n${body}`;
-  if (next !== post.raw) {
-    writeFileSync(path, next);
-    changed += 1;
-  }
+  if (next.replace(/\r\n/g, '\n') === post.raw.replace(/\r\n/g, '\n')) continue;
+  const out = post.raw.includes('\r\n') ? next.replace(/\n/g, '\r\n') : next;
+  writeFileSync(path, out);
+  changed += 1;
 }
 
 console.log(`[sanitize-blog] sanitized ${changed} file(s)`);

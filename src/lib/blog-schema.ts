@@ -79,8 +79,34 @@ export const draftField = z
   .optional()
   .transform((value) => value === true || value === 'true');
 
-/** Present only on some tenants; anything but "published" is unpublished. */
-export const statusField = z.string().optional();
+/** Present only on some tenants; `publish` (WordPress) and `published` both count as live. */
+export const statusField = z.preprocess((value) => {
+  if (value == null || value === '') return undefined;
+  if (typeof value === 'string') return value.trim() || undefined;
+  if (typeof value === 'object' && value !== null && 'value' in value) {
+    const inner = (value as { value?: unknown }).value;
+    return typeof inner === 'string' ? inner.trim() || undefined : undefined;
+  }
+  return String(value).trim() || undefined;
+}, z.string().optional());
+
+/**
+ * Payload/WordPress titles and authors sometimes arrive as numbers or
+ * `{ name }` objects. Rejecting those drops the post from the collection.
+ */
+export const looseStringField = z.preprocess((value) => {
+  if (value == null || value === '') return undefined;
+  if (typeof value === 'string') return value.trim() || undefined;
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    for (const key of ['name', 'title', 'label', 'value', 'email']) {
+      if (typeof obj[key] === 'string' && obj[key].trim()) return obj[key].trim();
+    }
+  }
+  const asString = String(value).trim();
+  return asString && asString !== '[object Object]' ? asString : undefined;
+}, z.string().optional());
 
 /** Payload can emit years as numbers — coerce every entry to a string. */
 export const stringListField = z

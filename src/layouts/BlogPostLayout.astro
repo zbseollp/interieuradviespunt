@@ -23,9 +23,12 @@ const exactMeta = fs.existsSync(metaPath)
 // Resolve rather than trusting the raw field: Payload writes /media/... paths
 // and media objects, neither of which is a valid src on this site.
 const featuredImage =
+  resolveFeaturedImage(entry.data, entry.body, { fallback: null }) ||
   resolveMediaUrl(exactMeta?.ogImage, { fallback: null }) ||
-  resolveFeaturedImage(entry.data, entry.body, { fallback: SITE_FALLBACK_IMAGE });
+  SITE_FALLBACK_IMAGE;
 const imageAlt = resolveFeaturedImageAlt(entry.data, entry.data.title);
+const authorRaw = (entry.data.author ?? '').trim();
+const author = /^(info_|admin$)/i.test(authorRaw) ? '' : authorRaw;
 const formattedDate = entry.data.pubDate.toLocaleDateString('nl-NL', {
   year: 'numeric',
   month: 'long',
@@ -50,8 +53,8 @@ const category = entry.data.categories?.[0] ?? 'Blog';
         )}
         <div class="article-hero__meta reveal">
           <time datetime={entry.data.pubDate.toISOString()}>{formattedDate}</time>
-          {entry.data.author && <span aria-hidden="true">·</span>}
-          {entry.data.author && <span>{entry.data.author}</span>}
+          {author && <span aria-hidden="true">·</span>}
+          {author && <span>{author}</span>}
         </div>
       </div>
     </header>

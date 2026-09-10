@@ -17,6 +17,9 @@ const fullTitle =
   title === 'Home'
     ? 'Wij helpen jou met je interieur - Interieuradviespunt.nl'
     : `${title} | Interieuradviespunt.nl`;
+const canonical = Astro.site
+  ? new URL(Astro.url.pathname.endsWith('/') ? Astro.url.pathname : `${Astro.url.pathname}/`, Astro.site).href
+  : undefined;
 ---
 <!doctype html>
 <html lang="nl-NL">
@@ -24,6 +27,7 @@ const fullTitle =
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={description} />
+    {canonical && <link rel="canonical" href={canonical} />}
     <link rel="icon" type="image/png" sizes="32x32" href="/images/2022/08/cropped-Group-5-32x32.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="/images/2022/08/cropped-Group-5-192x192.png" />
     <link rel="apple-touch-icon" href="/images/2022/08/cropped-Group-5-180x180.png" />

@@ -1,0 +1,133 @@
+---
+import { getRecentBlogPosts, postExcerpt, postHref } from '../lib/blog';
+import { resolveFeaturedImage } from '../lib/blogImages';
+import { SITE_FALLBACK_IMAGE } from '../lib/site-image';
+
+const posts = await getRecentBlogPosts(6);
+---
+{posts.length > 0 && (
+  <section class="recent-articles section">
+    <div class="container">
+      <div class="section-header section-header--center reveal">
+        <h2>Artikelen en blogs voor je interieur</h2>
+        <p>
+          Nieuwe artikelen uit de redactie. Elk stuk is onderzocht, zodat je actuele tips
+          en trends voor je woning hier terugvindt.
+        </p>
+      </div>
+      <div class="recent-articles__grid">
+        {posts.map((post, index) => {
+          const image =
+            resolveFeaturedImage(post.data, post.body, { fallback: SITE_FALLBACK_IMAGE }) ??
+            SITE_FALLBACK_IMAGE;
+          const dateLabel = post.data.pubDate.toLocaleDateString('nl-NL', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          });
+          return (
+            <a
+              href={postHref(post)}
+              class="recent-articles__card reveal"
+              style={`transition-delay: ${index * 0.04}s`}
+            >
+              <span class="recent-articles__media">
+                <img src={image} alt="" width="800" height="520" loading={index < 2 ? 'eager' : 'lazy'} />
+              </span>
+              <span class="recent-articles__body">
+                <time datetime={post.data.pubDate.toISOString()}>{dateLabel}</time>
+                <span class="recent-articles__title">{post.data.title}</span>
+                <span class="recent-articles__excerpt">{postExcerpt(post)}</span>
+              </span>
+            </a>
+          );
+        })}
+      </div>
+      <p class="recent-articles__more reveal">
+        <a href="/blog/" class="btn">Alle artikelen</a>
+      </p>
+    </div>
+  </section>
+)}
+
+<style>
+  .recent-articles__grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  @media (min-width: 700px) {
+    .recent-articles__grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 1000px) {
+    .recent-articles__grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  .recent-articles__card {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    color: inherit;
+    background: var(--color-bg-elevated);
+    overflow: hidden;
+    transition: transform var(--transition);
+  }
+
+  .recent-articles__card:hover {
+    transform: translateY(-3px);
+  }
+
+  .recent-articles__media {
+    display: block;
+    aspect-ratio: 16 / 10;
+    overflow: hidden;
+    background: #1f1f1f;
+  }
+
+  .recent-articles__media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .recent-articles__body {
+    display: grid;
+    gap: 0.45rem;
+    padding: 1.1rem 1.15rem 1.25rem;
+  }
+
+  .recent-articles__body time {
+    font-family: var(--font-heading);
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-accent);
+  }
+
+  .recent-articles__title {
+    font-family: var(--font-heading);
+    font-size: 1.15rem;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .recent-articles__excerpt {
+    font-size: 0.9375rem;
+    line-height: 1.55;
+    color: var(--color-muted);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .recent-articles__more {
+    margin: 2rem 0 0;
+    text-align: center;
+  }
+</style>

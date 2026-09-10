@@ -54,6 +54,7 @@ export const mainNavigation: NavItem[] = [
       { label: 'Kussenvulling', href: '/beste-kussenvulling/' },
     ],
   },
+  { label: 'Blog', href: '/blog/' },
   { label: 'Contact', href: '/contact/' },
 ];
 

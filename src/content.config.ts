@@ -4,14 +4,15 @@ import {
   draftField,
   imageField,
   looseDateField,
+  looseStringField,
   statusField,
   stringListField,
 } from './lib/blog-schema';
 
 /**
- * Payload-synced posts: title is the only hard requirement. Everything else
- * has a fallback, because a Zod rejection here drops the post from the
- * collection entirely — the article simply never comes online.
+ * Payload-synced posts: nothing in frontmatter is a hard drop besides a
+ * missing --- block. Title/dates/images all have fallbacks, because a Zod
+ * rejection here removes the post from the collection — it never comes online.
  */
 const blog = defineCollection({
   loader: glob({
@@ -20,14 +21,14 @@ const blog = defineCollection({
   }),
   schema: z
     .object({
-      title: z.string(),
-      description: z.string().optional(),
-      excerpt: z.string().optional(),
-      metaDescription: z.string().optional(),
+      title: looseStringField,
+      description: looseStringField,
+      excerpt: looseStringField,
+      metaDescription: looseStringField,
       pubDate: looseDateField,
       date: looseDateField,
       updatedDate: looseDateField,
-      author: z.string().optional(),
+      author: looseStringField,
       categories: stringListField,
       tags: stringListField,
       featuredImage: imageField,
@@ -37,10 +38,10 @@ const blog = defineCollection({
       featuredImageAlt: z.string().optional(),
       heroImageAlt: z.string().optional(),
       imageAlt: z.string().optional(),
-      slug: z.string().optional(),
-      permalink: z.string().optional(),
-      legacySlug: z.string().optional(),
-      seoTitle: z.string().optional(),
+      slug: looseStringField,
+      permalink: looseStringField,
+      legacySlug: looseStringField,
+      seoTitle: looseStringField,
       draft: draftField,
       _status: statusField,
       publishStatus: statusField,
@@ -48,8 +49,11 @@ const blog = defineCollection({
     .passthrough()
     .transform((data) => ({
       ...data,
+      title: data.title || data.seoTitle || 'Artikel',
       description: data.description || data.excerpt || data.metaDescription || '',
       pubDate: data.pubDate ?? data.date ?? new Date(0),
+      // Uncategorized Payload posts still belong on /category/blog/.
+      categories: data.categories?.length ? data.categories : ['Blog'],
     })),
 });
 
