@@ -12,7 +12,7 @@
     "astro": "astro",
     "migrate": "python3 scripts/migrate-wordpress.py",
     "fetch-products": "PYTHONUNBUFFERED=1 python3 scripts/fetch-product-pages.py",
-    "prepare:blog": "node scripts/assert-blog-count.mjs --snapshot && node scripts/restore-git-blog.mjs && node scripts/remove-spam-blog.mjs && node scripts/sanitize-blog.mjs && node scripts/validate-blog.mjs && node scripts/assert-blog-count.mjs --verify",
+    "prepare:blog": "node scripts/assert-blog-count.mjs --snapshot && node scripts/restore-git-blog.mjs && node scripts/restore-live-blog.mjs && node scripts/remove-spam-blog.mjs && node scripts/sanitize-blog.mjs && node scripts/validate-blog.mjs && node scripts/assert-blog-count.mjs --verify",
     "guard:deploy": "node scripts/guard-deploy.mjs",
     "deploy": "npm run build && wrangler deploy"
   },

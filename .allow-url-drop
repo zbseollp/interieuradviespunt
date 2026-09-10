@@ -1,0 +1,3 @@
+# Live URLs allowed to disappear on the next deploy.
+# One path per line. CMS smoke tests must not fail production.
+/test-test/

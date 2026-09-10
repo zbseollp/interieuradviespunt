@@ -21,14 +21,15 @@
  */
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { isCmsTestSlug } from './lib/cms-test-slug.mjs';
+import { crawlLiveListingHtml, extractLiveArticlePaths, siteOrigin } from './lib/live-site.mjs';
 
 const asJson = process.argv.includes('--json');
 const allowLoss = process.env.ALLOW_CONTENT_LOSS === '1';
 
 /**
- * Intentional malware takedown: source still exists but is `draft: true` with
- * `_spam:` — those live URLs are allowed to disappear from the next deploy.
- * Also allows paths listed in `.allow-url-drop` (one path per line).
+ * Intentional drops: `.allow-url-drop`, CMS smoke-test slugs, and malware
+ * takedowns still on disk as `draft: true` + `_spam:`.
  */
 function allowUrlDropSet() {
   const file = '.allow-url-drop';
@@ -45,9 +46,10 @@ function allowUrlDropSet() {
 
 const ALLOW_DROPS = allowUrlDropSet();
 
-function isIntentionalSpamDrop(urlPath) {
+function isIntentionalDrop(urlPath) {
   const normalized = urlPath.endsWith('/') ? urlPath : `${urlPath}/`;
   if (ALLOW_DROPS.has(normalized)) return true;
+  if (isCmsTestSlug(normalized)) return true;
 
   const slug = urlPath.replace(/^\/+|\/+$/g, '').split('/').pop();
   if (!slug) return false;
@@ -58,15 +60,6 @@ function isIntentionalSpamDrop(urlPath) {
     return /^draft:\s*true\b/m.test(raw) && /^_spam:/m.test(raw);
   }
   return false;
-}
-
-function siteOrigin() {
-  for (const f of ['astro.config.mjs', 'astro.config.ts']) {
-    if (!existsSync(f)) continue;
-    const m = readFileSync(f, 'utf8').match(/site:\s*['"](https?:\/\/[^'"]+)['"]/);
-    if (m) return m[1].replace(/\/+$/, '');
-  }
-  return null;
 }
 
 /** Every route dist/ actually generated. */
@@ -83,15 +76,6 @@ function builtRoutes(dir = 'dist', base = '') {
   return out;
 }
 
-async function fetchText(url) {
-  try {
-    const res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(25000) });
-    return res.ok ? await res.text() : '';
-  } catch {
-    return '';
-  }
-}
-
 const origin = siteOrigin();
 if (!origin) {
   console.log('[guard-deploy] no `site` in astro.config — cannot compare against live, skipping');
@@ -104,34 +88,13 @@ if (built.size === 0) {
   process.exit(1);
 }
 
-// Listing paths differ per tenant, and several redirect (/blog/ → /blogs/).
-// Take whichever returns the most content rather than assuming one.
-const CANDIDATES = ['/blog/', '/blogs/', '/artikelen/', '/laatste-berichten/', '/laatste-blogs/', '/'];
-let best = { path: null, html: '' };
-for (const p of CANDIDATES) {
-  const html = await fetchText(origin + p);
-  if (html.length > best.html.length) best = { path: p, html };
-}
-if (!best.html) {
+const { html, pages } = await crawlLiveListingHtml(origin);
+if (!html) {
   console.error(`[guard-deploy] could not reach ${origin} — refusing to deploy blind`);
   process.exit(1);
 }
 
-// Follow pagination so page 2+ posts are covered too.
-const pages = new Set([best.path]);
-for (const m of best.html.matchAll(/href="(?:https?:\/\/[^/]+)?(\/[a-z0-9-]*\/(?:\d+)\/)"/gi)) {
-  if (pages.size < 30) pages.add(m[1]);
-}
-let html = best.html;
-for (const p of pages) {
-  if (p === best.path) continue;
-  html += await fetchText(origin + p);
-}
-
-const liveLinks = new Set();
-for (const m of html.matchAll(/href="(?:https?:\/\/[^/]+)?(\/[a-z0-9][a-z0-9-]{6,}\/)"/gi)) {
-  liveLinks.add(m[1]);
-}
+const liveLinks = extractLiveArticlePaths(html);
 
 // A link on the listing is not proof the page exists — these sites carry dead
 // internal links (…/instagram-likes-kopen/ and friends already 404). Only a URL
@@ -139,10 +102,10 @@ for (const m of html.matchAll(/href="(?:https?:\/\/[^/]+)?(\/[a-z0-9][a-z0-9-]{6
 const candidates = [...liveLinks].filter((u) => !built.has(u)).sort();
 const missing = [];
 const alreadyDead = [];
-const intentionalSpam = [];
+const intentional = [];
 for (const u of candidates) {
-  if (isIntentionalSpamDrop(u)) {
-    intentionalSpam.push(u);
+  if (isIntentionalDrop(u)) {
+    intentional.push(u);
     continue;
   }
   let ok = false;
@@ -154,21 +117,29 @@ for (const u of candidates) {
   }
   (ok ? missing : alreadyDead).push(u);
 }
-if (intentionalSpam.length > 0) {
+if (intentional.length > 0) {
   console.log(
-    `[guard-deploy] allowing ${intentionalSpam.length} intentional spam draft drop(s): ` +
-      intentionalSpam.slice(0, 5).join(', ') + (intentionalSpam.length > 5 ? ' …' : ''),
+    `[guard-deploy] allowing ${intentional.length} intentional drop(s): ` +
+      intentional.slice(0, 5).join(', ') +
+      (intentional.length > 5 ? ' …' : ''),
   );
 }
 if (alreadyDead.length > 0) {
   console.log(
     `[guard-deploy] ignoring ${alreadyDead.length} listing link(s) that already 404 live: ` +
-      alreadyDead.slice(0, 5).join(', ') + (alreadyDead.length > 5 ? ' …' : ''),
+      alreadyDead.slice(0, 5).join(', ') +
+      (alreadyDead.length > 5 ? ' …' : ''),
   );
 }
 
 if (asJson) {
-  console.log(JSON.stringify({ origin, listing: best.path, live: liveLinks.size, built: built.size, missing }, null, 2));
+  console.log(
+    JSON.stringify(
+      { origin, listing: pages, live: liveLinks.size, built: built.size, missing },
+      null,
+      2,
+    ),
+  );
 }
 
 if (missing.length === 0) {
