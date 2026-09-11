@@ -53,7 +53,12 @@ const OFF_TOPIC_TITLE_PATTERNS = [
   /\b(?:vermogen|lengte|leeftijd) van\b/i,
 ];
 
+const EDITORIAL_ALLOWLIST = new Set([
+  'hoe-een-fysiek-luxecasino-eruit-zou-zien-in-de-nederlandse-designtraditie',
+]);
+
 function hardSpamReason(slug, title, body) {
+  if (EDITORIAL_ALLOWLIST.has(slug)) return null;
   const haystack = `${slug}\n${title}\n${body}`;
   if (INJECTION_PATTERNS.some((p) => p.test(haystack))) {
     return 'injected script/redirect payload';

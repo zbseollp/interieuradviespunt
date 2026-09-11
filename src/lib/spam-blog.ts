@@ -24,6 +24,14 @@ const INJECTION_PATTERNS: RegExp[] = [
   /<meta[^>]+http-equiv=["']?refresh["']?[^>]*url=/i,
 ];
 
+/**
+ * Editorial posts that mention casino as a design subject.
+ * Without this, the slug/title casino rules hide a live interior article.
+ */
+const EDITORIAL_ALLOWLIST = new Set([
+  'hoe-een-fysiek-luxecasino-eruit-zou-zien-in-de-nederlandse-designtraditie',
+]);
+
 /** Casino / gambling SEO spam (slug or title). */
 const CASINO_PATTERNS: RegExp[] = [
   /(?:^|-)(?:online-)?casinos?(?:-|$)/i,
@@ -75,6 +83,7 @@ function hasAffiliateHost(body: string): boolean {
  * Checks slug, title and body so title-only spam is caught too.
  */
 export function isSpamBlogPost(id: string, body = '', title = ''): boolean {
+  if (EDITORIAL_ALLOWLIST.has(id)) return false;
   const haystack = `${id}\n${title}\n${body}`;
   if (hasInjectedPayload(haystack)) return true;
   if (hasCasinoSpam(`${id}\n${title}`)) return true;
