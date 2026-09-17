@@ -11,7 +11,7 @@
  *  - turn hybrid <br /><br />## Heading into Markdown blank-line headings
  */
 import { writeFileSync } from 'node:fs';
-import { resolveMediaUrl } from '../src/lib/media-url.mjs';
+import { correctLocalPublicPath, resolveMediaUrl } from '../src/lib/media-url.mjs';
 import { BLOG_DIR, exists, listBlogFiles, readPost } from './lib/blog-files.mjs';
 import { sanitizeMdxBody } from './lib/mdx-sanitize.mjs';
 
@@ -42,7 +42,9 @@ function needsQuoting(value) {
 function normalizeImageValue(value) {
   if (!value) return '';
   const repaired = resolveMediaUrl(value, { fallback: null });
-  return repaired || value;
+  if (!repaired) return '';
+  // Persist on-disk letter-case for local public/ paths (Cloudflare is case-sensitive).
+  return correctLocalPublicPath(repaired);
 }
 
 /**
@@ -80,12 +82,16 @@ if (!exists(BLOG_DIR)) {
 
 let changed = 0;
 
-for (const path of listBlogFiles()) {
-  const post = readPost(path);
+for (const filePath of listBlogFiles()) {
+  const post = readPost(filePath);
   if (!post.hasFrontmatter) continue;
 
-  let frontmatter = post.frontmatter;
-  let body = post.body;
+  // Normalize to LF before any regex work. Orphan `\r` bytes (from bad CRLF
+  // writes) must be stripped — converting them to `\n` invents blank lines.
+  const toLf = (s) => s.replace(/\r\n/g, '\n').replace(/\r/g, '');
+  let frontmatter = toLf(post.frontmatter);
+  let body = toLf(post.body);
+  const prevLf = toLf(post.raw);
 
   for (const field of IMAGE_FIELDS) {
     frontmatter = frontmatter.replace(
@@ -134,10 +140,12 @@ for (const path of listBlogFiles()) {
 
   body = sanitizeMdxBody(stripWordpressChrome(normalizeHybridMarkdown(body)));
 
-  const next = `---\n${frontmatter}\n---\n${body}`;
-  if (next.replace(/\r\n/g, '\n') === post.raw.replace(/\r\n/g, '\n')) continue;
-  const out = post.raw.includes('\r\n') ? next.replace(/\n/g, '\r\n') : next;
-  writeFileSync(path, out);
+  const nextLf = `---\n${frontmatter}\n---\n${body}`;
+  if (nextLf === prevLf) continue;
+  // Also skip when the only difference vs disk is newline style.
+  if (nextLf === toLf(post.raw)) continue;
+  const out = /\r\n/.test(post.raw) ? nextLf.replace(/\n/g, '\r\n') : nextLf;
+  writeFileSync(filePath, out);
   changed += 1;
 }
 

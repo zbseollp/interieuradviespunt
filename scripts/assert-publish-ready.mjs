@@ -112,8 +112,8 @@ function readField(frontmatter, field) {
 }
 
 /**
- * Slugs that getBlogPosts / getStaticPaths will publish — draft out, far-future out.
- * Missing dates count as live (schema falls back to epoch).
+ * Slugs that getBlogPosts / getStaticPaths will publish.
+ * Leftover Payload `draft: true` alone is NOT unpublished — CMS status is.
  */
 function liveSlugs() {
   if (!existsSync(BLOG)) return [];
@@ -121,20 +121,30 @@ function liveSlugs() {
   const out = [];
   for (const name of readdirSync(BLOG)) {
     if (!/\.mdx?$/.test(name)) continue;
+    const slug = name.replace(/\.mdx?$/, '');
+    if (slug === 'hello-world' || slug.startsWith('blog-template') || slug.startsWith('_')) continue;
+    if (slug.includes('_unpublished') || slug.includes('_spam')) continue;
+
     const raw = readFileSync(join(BLOG, name), 'utf8');
-    if (/^draft:\s*true\b/m.test(raw)) continue;
     if (/^_spam:/m.test(raw)) continue;
+
     const publishStatus = raw.match(/^publishStatus:\s*["']?(\w+)/m)?.[1];
     const wpStatus = raw.match(/^_status:\s*["']?(\w+)/m)?.[1];
-    const status = publishStatus || wpStatus || 'published';
-    if (!/^publish/i.test(status)) continue;
+    const status = (publishStatus || wpStatus || '').toLowerCase();
+    if (status === 'draft' || status === 'unpublished' || status === 'private' || status === 'trash' || status === 'archived') {
+      continue;
+    }
+    // Missing status → treat as published (matches isPublished in src/lib/blog.ts).
+    if (status && !(status === 'published' || status === 'publish' || status === 'live')) {
+      continue;
+    }
 
     const fm = (raw.match(/^---\r?\n([\s\S]*?)\r?\n---/) || [])[1] || '';
     const dateRaw = readField(fm, 'pubDate') ?? readField(fm, 'date');
     const t = dateRaw ? parseLooseDate(dateRaw) : 0;
     if (t !== null && t > now + FUTURE_SLACK_MS) continue;
 
-    out.push(name.replace(/\.mdx?$/, ''));
+    out.push(slug);
   }
   return out.sort();
 }

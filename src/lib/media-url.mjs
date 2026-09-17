@@ -6,6 +6,8 @@
  * the objects actually live at `{R2_PUBLIC_URL}/tenants/{slug}/{filename}`.
  * Everything that renders an image goes through resolveMediaUrl().
  */
+import fs from 'node:fs';
+import path from 'node:path';
 
 /** Matches astropayload.config.json tenantSlug for this site. */
 export const DEFAULT_TENANT_SLUG = 'interieuradviespunt';
@@ -29,6 +31,62 @@ const LOCAL_PATH_PREFIXES = [
 
 /** Media paths Payload owns — these must be rewritten to the R2 base. */
 const PAYLOAD_PATH_PREFIXES = ['/media/', '/api/media/'];
+
+/** Cache: requested public path → real on-disk casing (or null if missing). */
+const localPublicCaseCache = new Map();
+
+/**
+ * Cloudflare Workers serve `public/` case-sensitively. Frontmatter often has
+ * Windows/WP paths with the wrong letter case (…nederlandse… vs …Nederlandse…).
+ * At build time, rewrite to the real filesystem casing so cards/heroes load.
+ *
+ * @param {string} publicPath
+ * @returns {string}
+ */
+export function correctLocalPublicPath(publicPath) {
+  if (!publicPath || typeof publicPath !== 'string' || !publicPath.startsWith('/')) {
+    return publicPath;
+  }
+  if (!LOCAL_PATH_PREFIXES.some((prefix) => publicPath.startsWith(prefix))) {
+    return publicPath;
+  }
+  if (typeof process === 'undefined' || typeof process.cwd !== 'function') {
+    return publicPath;
+  }
+
+  const key = publicPath.split(/[?#]/)[0];
+  if (localPublicCaseCache.has(key)) {
+    return localPublicCaseCache.get(key) || publicPath;
+  }
+
+  try {
+    const parts = key.replace(/^\/+/, '').split('/').filter(Boolean);
+    let abs = path.join(process.cwd(), 'public');
+    const out = [];
+    for (const part of parts) {
+      if (!fs.existsSync(abs)) {
+        localPublicCaseCache.set(key, null);
+        return publicPath;
+      }
+      // readdir + exact compare — existsSync is case-blind on Windows.
+      const entries = fs.readdirSync(abs);
+      const exact = entries.find((e) => e === part);
+      const hit = exact || entries.find((e) => e.toLowerCase() === part.toLowerCase());
+      if (!hit) {
+        localPublicCaseCache.set(key, null);
+        return publicPath;
+      }
+      out.push(hit);
+      abs = path.join(abs, hit);
+    }
+    const corrected = `/${out.join('/')}`;
+    localPublicCaseCache.set(key, corrected);
+    return corrected;
+  } catch {
+    localPublicCaseCache.set(key, null);
+    return publicPath;
+  }
+}
 
 function envBag(env) {
   if (env) return env;
@@ -197,8 +255,10 @@ export function resolveMediaUrl(input, options = {}) {
   const path = raw.startsWith('/') ? raw : `/${raw}`;
 
   // Served from public/ — keep same-origin, absolutize only for OG tags.
+  // Correct letter-case against disk so Cloudflare (case-sensitive) does not 404.
   if (LOCAL_PATH_PREFIXES.some((prefix) => path.startsWith(prefix))) {
-    return siteOrigin ? new URL(path, siteOrigin).href : path;
+    const local = correctLocalPublicPath(path);
+    return siteOrigin ? new URL(local, siteOrigin).href : local;
   }
 
   // Payload-owned media → {base}/tenants/{slug}/{filename}

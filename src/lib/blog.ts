@@ -26,28 +26,37 @@ function timestamp(post: Post): number {
   return 0;
 }
 
-/**
- * Payload `published` and WordPress `publish` are both live.
- * Missing status means "treat as published" — a Payload extra field must not
- * hide a post the CMS already marked published.
- */
-function isLiveStatus(value?: string): boolean {
-  if (!value) return true;
-  return /^publish/i.test(value);
+const STUB_SLUGS = new Set(['hello-world', 'blog-template']);
+const UNPUBLISHED = new Set(['draft', 'unpublished', 'private', 'trash', 'archived']);
+const PUBLISHED = new Set(['published', 'publish', 'live']);
+
+function statusOf(data: Post['data']): string {
+  const rec = data as { publishStatus?: string; _status?: string; status?: string };
+  const raw = rec.publishStatus || rec._status || rec.status || '';
+  return String(raw).trim().toLowerCase();
 }
 
 /**
  * Single source of truth for "is this post live?".
  * Every listing and every getStaticPaths must go through getBlogPosts(), so a
  * post can never be listed in one place and 404 in another.
+ *
+ * Leftover Payload `draft: true` is NOT unpublished — CMS publishStatus /
+ * _status (and WordPress publish) are source of truth. Hide only stubs,
+ * explicit unpublished/`_unpublished`, or `_spam`.
  */
 export function isPublished(post: Post): boolean {
-  if (post.data.draft) return false;
+  const slug = post.id.toLowerCase().replace(/\.mdx?$/i, '');
+  if (STUB_SLUGS.has(slug) || slug.startsWith('blog-template') || slug.startsWith('_')) {
+    return false;
+  }
+  if (slug.includes('_unpublished') || slug.includes('_spam')) return false;
+  if ((post.data as { _spam?: unknown })._spam) return false;
 
-  const publishStatus = (post.data as { publishStatus?: string }).publishStatus;
-  if (publishStatus) {
-    if (!isLiveStatus(publishStatus)) return false;
-  } else if (post.data._status && !isLiveStatus(post.data._status)) {
+  const status = statusOf(post.data);
+  if (PUBLISHED.has(status)) {
+    /* published wins over leftover draft */
+  } else if (UNPUBLISHED.has(status)) {
     return false;
   }
 
@@ -60,7 +69,7 @@ export function isPublished(post: Post): boolean {
 
 /** Newest-first published posts from the local collection (filled by Payload sync). */
 export async function getBlogPosts(): Promise<Post[]> {
-  const posts = await getCollection('blog', ({ data }) => !data.draft);
+  const posts = await getCollection('blog');
   return posts.filter(isPublished).sort((a, b) => timestamp(b) - timestamp(a));
 }
 
